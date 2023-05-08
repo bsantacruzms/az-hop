@@ -103,7 +103,7 @@ Once deployed, you can connect to the OnDemand web portal via:
 - When using a Service Principal Name, the service principal needs to be
   - **"Contributor"** on the subscription
   - **"User Access Administrator"** on the subscription
-- When using a managed Identity on a deployer VM it needs to be a **System Managed Identity** with
+- When using a managed Identity on a deployer VM it needs to be a **System/User Managed Identity** with
   - **"Contributor"** on the resource group
   - **"User Access Administrator"** on the subscription
   - **"Reader"** on the subscription
@@ -216,7 +216,7 @@ Afterwards, you can directly run the `install.sh`  script:
 `az-hop` can be deployed directly from an Ubuntu 20.04 VM on Azure.
 
 ## Create a deployer VM
-Create a deployer VM in its own isolated VNET and if required with an Azure Bastion. Once built, enable System Managed Identity and grant the following roles :
+Create a deployer VM in its own isolated VNET and if required with an Azure Bastion. Once built, enable System/User Managed Identity and grant the following roles :
   - **"Contributor"** on the subscription
   - **"User Access Administrator"** on the subscription
   - **"Reader"** on the subscription
@@ -428,7 +428,9 @@ azurefiles:
 mounts:
   # mount settings for the user home directory
   home: # This home name can't be changed
-    type: anf # anf or azurefiles, default to anf. One of the two should be defined in order to mount the home directory
+    # type of mount : existing, anf or azurefiles, default to existing. One of the three should be defined in order to mount the home directory
+    # When using existing, the mountpoint, server, export and options should be defined, for other cases leave the values as defined with the curly braces
+    type: anf
     mountpoint: /anfhome # /sharedhome for example
     server: '{{anf_home_ip}}' # Specify an existing NFS server name or IP, when using the ANF built in use '{{anf_home_ip}}'
     export: '{{anf_home_path}}' # Specify an existing NFS export directory, when using the ANF built in use '{{anf_home_path}}'
