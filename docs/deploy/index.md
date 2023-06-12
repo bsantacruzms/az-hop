@@ -395,7 +395,10 @@ log_analytics:
 
 # Option to install the monitoring agent on static infra VMs. Can be disabled if the agent is installed by policy.  
 monitoring: 
-  install_agent: true
+  azure_monitor_agent: true
+  # Optional settings to deploy Grafana and install Telegraf
+  telegraf: true # Install telegraf on static infra VMs and dynamic compute nodes. Default: true
+  grafana: true # Deploy a Grafana instance with pre-defined dashboards. Default: true
 
 #If set to true, it will create alert rules associated with az-hop. Enablement of alerting will require the specification of an admin email to send alerts to.
 alerting:
@@ -593,6 +596,9 @@ scheduler:
 # CycleCloud VM configuration
 cyclecloud:
   vm_size: Standard_B2ms
+  # Optional: use Ubuntu for the CycleCloud VM (default: linux_base_image)
+  # image: "canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest"
+  # plan: publisher:product:name
   # version: 8.3.0-3062 # to specify a specific version, see https://packages.microsoft.com/yumrepos/cyclecloud/
 
 # Lustre cluster is optional and can be used to create a Lustre cluster in the environment.

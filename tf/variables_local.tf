@@ -81,7 +81,8 @@ locals {
     use_existing_ws = ( !local.create_log_analytics_workspace && local.log_analytics_workspace_id != null )  ? true : false
      
     monitor = ( local.create_log_analytics_workspace || local.use_existing_ws ) ? true : false
-    ama_install = try(local.configuration_yml["monitoring"]["install_agent"], true) && local.monitor ? true : false
+    ama_install = try(local.configuration_yml["monitoring"]["azure_monitor_agent"], true) && local.monitor ? true : false
+    create_grafana = try(local.configuration_yml["monitoring"]["grafana"], true)
 
     alert_email = try(local.configuration_yml["alerting"]["admin_email"], "admin.mail@contoso.com")
 
@@ -119,6 +120,8 @@ locals {
     use_lustre_image_reference = try(length(split(":", local.configuration_yml["lustre_base_image"])[1])>0, false)
     # Use a linux custom image reference if the linux_base_image is defined and contains ":"
     use_windows_image_reference = try(length(split(":", local.configuration_yml["windows_base_image"])[1])>0, false)
+    # Use a linux custom image reference if the linux_base_image is defined and contains ":"
+    use_cyclecloud_image_reference = try(length(split(":", local.configuration_yml["cyclecloud"]["image"])[1])>0, false)
 
     linux_base_image_reference = {
         publisher = local.use_linux_image_reference ? split(":", local.configuration_yml["linux_base_image"])[0] : "OpenLogic"
@@ -138,6 +141,12 @@ locals {
         sku       = local.use_windows_image_reference ? split(":", local.configuration_yml["windows_base_image"])[2] : "2019-Datacenter-smalldisk"
         version   = local.use_windows_image_reference ? split(":", local.configuration_yml["windows_base_image"])[3] : "latest"
     }
+    cyclecloud_image_reference = {
+        publisher = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[0] : "OpenLogic"
+        offer     = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[1] : "CentOS"
+        sku       = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[2] : "7_9-gen2"
+        version   = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[3] : "latest"
+    }
 
     # Use a linux custom image id if the linux_base_image is defined and contains "/"
     use_linux_image_id = try(length(split("/", local.configuration_yml["linux_base_image"])[1])>0, false)
@@ -150,6 +159,10 @@ locals {
     # Use a windows custom image id if the windows_base_image is defined and contains "/"
     use_windows_image_id = try(length(split("/", local.configuration_yml["windows_base_image"])[1])>0, false)
     windows_image_id = local.use_windows_image_id ? local.configuration_yml["windows_base_image"] : null
+
+    # Use a cyclecloud custom image id if the cyclecloud_base_image is defined and contains "/"
+    use_cyclecloud_image_id = try(length(split("/", local.configuration_yml["cyclecloud"]["image"])[1])>0, false)
+    cyclecloud_image_id = local.use_cyclecloud_image_id ? local.configuration_yml["cyclecloud"]["image"] : null
 
     _empty_image_plan = {}
     _linux_base_image_plan = {
@@ -165,6 +178,14 @@ locals {
         name      = try(split(":", local.configuration_yml["lustre_base_plan"])[2], "azurehpc-lustre-2_12")
     }
     lustre_image_plan = try( length(local._lustre_base_image_plan.publisher) > 0 ? local._lustre_base_image_plan : local._empty_image_plan, local._empty_image_plan)
+
+    _cyclecloud_image_plan = {
+        publisher = try(split(":", local.configuration_yml["cyclecloud"]["plan"])[0], "")
+        product   = try(split(":", local.configuration_yml["cyclecloud"]["plan"])[1], "")
+        name      = try(split(":", local.configuration_yml["cyclecloud"]["plan"])[2], "")
+    }
+    cyclecloud_image_plan = try( length(local._cyclecloud_image_plan.publisher) > 0 ? local._cyclecloud_image_plan : local._empty_image_plan, local._empty_image_plan)
+
 
     # Create the RG if not using an existing RG and (creating a VNET or when reusing a VNET in another resource group)
     use_existing_rg = try(local.configuration_yml["use_existing_rg"], false)
@@ -423,11 +444,6 @@ locals {
         AllowComputeNoVncIn         = ["470", "Inbound", "Allow", "Tcp", "NoVnc",              "subnet/compute",            "asg/asg-ondemand"],
         AllowNoVncComputeIn         = ["480", "Inbound", "Allow", "Tcp", "NoVnc",              "asg/asg-ondemand",          "subnet/compute"],
 
-        # Telegraf / Grafana
-        AllowTelegrafIn             = ["490", "Inbound", "Allow", "Tcp", "Telegraf",           "asg/asg-telegraf",          "asg/asg-grafana"],
-        AllowComputeTelegrafIn      = ["500", "Inbound", "Allow", "Tcp", "Telegraf",           "subnet/compute",            "asg/asg-grafana"],
-        AllowGrafanaIn              = ["510", "Inbound", "Allow", "Tcp", "Grafana",            "asg/asg-ondemand",          "asg/asg-grafana"],
-
         # Admin and Deployment
         AllowWinRMIn                = ["520", "Inbound", "Allow", "Tcp", "WinRM",              "asg/asg-jumpbox",          "asg/asg-rdp"],
         AllowRdpIn                  = ["550", "Inbound", "Allow", "Tcp", "Rdp",                "asg/asg-jumpbox",          "asg/asg-rdp"],
@@ -494,11 +510,6 @@ locals {
         # SMB
         AllowSMBComputeOut          = ["455", "Outbound", "Allow", "*",   "SMB",                "subnet/compute",            "subnet/netapp"],
 
-        # Telegraf / Grafana
-        AllowTelegrafOut            = ["460", "Outbound", "Allow", "Tcp", "Telegraf",           "asg/asg-telegraf",          "asg/asg-grafana"],
-        AllowComputeTelegrafOut     = ["470", "Outbound", "Allow", "Tcp", "Telegraf",           "subnet/compute",            "asg/asg-grafana"],
-        AllowGrafanaOut             = ["480", "Outbound", "Allow", "Tcp", "Grafana",            "asg/asg-ondemand",          "asg/asg-grafana"],
-
         # SSH internal rules
         AllowSshFromJumpboxOut      = ["490", "Outbound", "Allow", "Tcp", "Ssh",                "asg/asg-jumpbox",          "asg/asg-ssh"],
         AllowSshComputeOut          = ["500", "Outbound", "Allow", "Tcp", "Ssh",                "asg/asg-ssh",              "subnet/compute"],
@@ -547,10 +558,23 @@ locals {
         AllowInternalWebUsersIn     = ["540", "Inbound", "Allow", "Tcp", "Web",                "subnet/gateway",           "asg/asg-ondemand"],
     }
 
+    grafana_nsg_rules = {
+        # Telegraf / Grafana
+        AllowTelegrafIn             = ["490", "Inbound", "Allow", "Tcp", "Telegraf",           "asg/asg-telegraf",          "asg/asg-grafana"],
+        AllowComputeTelegrafIn      = ["500", "Inbound", "Allow", "Tcp", "Telegraf",           "subnet/compute",            "asg/asg-grafana"],
+        AllowGrafanaIn              = ["510", "Inbound", "Allow", "Tcp", "Grafana",            "asg/asg-ondemand",          "asg/asg-grafana"],
+
+        # Telegraf / Grafana
+        AllowTelegrafOut            = ["460", "Outbound", "Allow", "Tcp", "Telegraf",           "asg/asg-telegraf",          "asg/asg-grafana"],
+        AllowComputeTelegrafOut     = ["470", "Outbound", "Allow", "Tcp", "Telegraf",           "subnet/compute",            "asg/asg-grafana"],
+        AllowGrafanaOut             = ["480", "Outbound", "Allow", "Tcp", "Grafana",            "asg/asg-ondemand",          "asg/asg-grafana"],
+    }
+
     nsg_rules = merge(  local._nsg_rules, 
                         local.no_bastion_subnet ? {} : local.bastion_nsg_rules, 
                         local.no_gateway_subnet ? {} : local.gateway_nsg_rules,
-                        local.allow_public_ip ? local.internet_nsg_rules : local.hub_nsg_rules)
+                        local.allow_public_ip ? local.internet_nsg_rules : local.hub_nsg_rules,
+                        local.create_grafana ? local.grafana_nsg_rules : {})
 
 }
 

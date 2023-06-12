@@ -43,6 +43,7 @@ var deployerSshPort = deployDeployer ? (contains(azhopConfig.deployer, 'ssh_port
 var deployLustre = contains(azhopConfig, 'lustre') && contains(azhopConfig.lustre, 'create') ? azhopConfig.lustre.create : false
 var deployJumpbox = contains(azhopConfig, 'jumpbox') ? true : false
 var deployDeployer = contains(azhopConfig, 'deployer') ? true : false
+var deployGrafana = contains(azhopConfig, 'monitoring') && contains(azhopConfig.monitoring, 'grafana') ? azhopConfig.monitoring.grafana : true
 var enableWinViz = contains(azhopConfig, 'enable_remote_winviz') ? azhopConfig.enable_remote_winviz : false
 
 var useExistingAD = contains(azhopConfig, 'domain') ? azhopConfig.domain.use_existing_dc : false
@@ -56,6 +57,8 @@ var linuxBasePlan = contains(azhopConfig, 'linux_base_plan') ? azhopConfig.linux
 var windowsBaseImage = contains(azhopConfig, 'windows_base_image') ? azhopConfig.windows_base_image : 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-smalldisk:latest'
 var lustreBaseImage = contains(azhopConfig, 'lustre_base_image') ? azhopConfig.lustre_base_image : 'azhpc:azurehpc-lustre:azurehpc-lustre-2_12:latest'
 var lustreBasePlan = contains(azhopConfig, 'lustre_base_plan') ? azhopConfig.lustre_base_plan : 'azhpc:azurehpc-lustre:azurehpc-lustre-2_12'
+var cyclecloudBaseImage = contains(azhopConfig.cyclecloud, 'image') ? azhopConfig.cyclecloud.image : 'OpenLogic:CentOS:7_9-gen2:latest'
+var cyclecloudBasePlan = contains(azhopConfig.cyclecloud, 'plan') ? azhopConfig.cyclecloud.plan : ''
 
 var createDatabase = (config.queue_manager == 'slurm' && config.slurm.accounting_enabled ) || config.enable_remote_winviz
 
@@ -123,6 +126,8 @@ var config = {
   key_vault_name: contains(azhopConfig, 'azure_key_vault') ? azhopConfig.azure_key_vault.name : 'kv${resourcePostfix}'
   storage_account_name: contains(azhopConfig, 'azure_storage_account') ? azhopConfig.azure_storage_account.name : 'azhop${resourcePostfix}'
   mariadb_name: contains(azhopConfig, 'database') && contains(azhopConfig.database, 'name') ? azhopConfig.database.name : 'azhop-${resourcePostfix}'
+
+  deploy_grafana: deployGrafana
 
   enable_remote_winviz : enableWinViz
   deploy_sig: contains(azhopConfig, 'image_gallery') && contains(azhopConfig.image_gallery, 'create') ? azhopConfig.image_gallery.create : false
@@ -252,6 +257,17 @@ var config = {
         version: split(windowsBaseImage,':')[3]
       }
     }
+    cyclecloud_base: {
+      plan: cyclecloudBasePlan
+      ref: contains(cyclecloudBaseImage, '/') ? {
+        id: cyclecloudBaseImage
+      } : {
+        publisher: split(cyclecloudBaseImage,':')[0]
+        offer: split(cyclecloudBaseImage,':')[1]
+        sku: split(cyclecloudBaseImage,':')[2]
+        version: split(cyclecloudBaseImage,':')[3]
+      }
+    }
   }
 
 
@@ -268,18 +284,11 @@ var config = {
           deployLustre ? [ 'asg-lustre-client' ] : []
         )
       }
-      grafana: {
-        subnet: 'admin'
-        sku: azhopConfig.grafana.vm_size
-        osdisksku: 'StandardSSD_LRS'
-        image: 'linux_base'
-        asgs: [ 'asg-ssh', 'asg-grafana', 'asg-ad-client', 'asg-telegraf', 'asg-nfs-client' ]
-      }
       ccportal: {
         subnet: 'admin'
         sku: azhopConfig.cyclecloud.vm_size
         osdisksku: 'StandardSSD_LRS'
-        image: 'linux_base'
+        image: 'cyclecloud_base'
         datadisks: [
           {
             name: 'ccportal-datadisk0'
@@ -372,6 +381,15 @@ var config = {
         deploy_script: jumpboxSshPort != 22 ? replace(loadTextContent('jumpbox.yml'), '__SSH_PORT__', string(jumpboxSshPort)) : ''
       }
     } : {},
+    deployGrafana ? {
+      grafana: {
+        subnet: 'admin'
+        sku: azhopConfig.grafana.vm_size
+        osdisksku: 'StandardSSD_LRS'
+        image: 'linux_base'
+        asgs: [ 'asg-ssh', 'asg-grafana', 'asg-ad-client', 'asg-telegraf', 'asg-nfs-client' ]
+      }
+    } : {},
     deployLustre ? {
       lustre: {
         subnet: 'admin'
@@ -395,8 +413,9 @@ var config = {
     } : {}
   )
 
-  asg_names: union([ 'asg-ssh', 'asg-rdp', 'asg-jumpbox', 'asg-ad', 'asg-ad-client', 'asg-pbs', 'asg-pbs-client', 'asg-cyclecloud', 'asg-cyclecloud-client', 'asg-nfs-client', 'asg-telegraf', 'asg-grafana', 'asg-robinhood', 'asg-ondemand', 'asg-deployer', 'asg-guacamole', 'asg-mariadb-client' ],
-    deployLustre ? [ 'asg-lustre', 'asg-lustre-client' ] : []
+  asg_names: union([ 'asg-ssh', 'asg-rdp', 'asg-jumpbox', 'asg-ad', 'asg-ad-client', 'asg-pbs', 'asg-pbs-client', 'asg-cyclecloud', 'asg-cyclecloud-client', 'asg-nfs-client', 'asg-telegraf', 'asg-robinhood', 'asg-ondemand', 'asg-deployer', 'asg-guacamole', 'asg-mariadb-client' ],
+    deployLustre ? [ 'asg-lustre', 'asg-lustre-client' ] : [],
+    deployGrafana ? [ 'asg-grafana' ] : []
   )
 
   service_ports: {
@@ -476,11 +495,6 @@ var config = {
       AllowComputeNoVncIn         : ['470', 'Inbound', 'Allow', 'Tcp', 'NoVnc', 'subnet', 'compute', 'asg', 'asg-ondemand']
       AllowNoVncComputeIn         : ['480', 'Inbound', 'Allow', 'Tcp', 'NoVnc', 'asg', 'asg-ondemand', 'subnet', 'compute']
     
-      // Telegraf / Grafana
-      AllowTelegrafIn             : ['490', 'Inbound', 'Allow', 'Tcp', 'Telegraf', 'asg', 'asg-telegraf', 'asg', 'asg-grafana']
-      AllowComputeTelegrafIn      : ['500', 'Inbound', 'Allow', 'Tcp', 'Telegraf', 'subnet', 'compute', 'asg', 'asg-grafana']
-      AllowGrafanaIn              : ['510', 'Inbound', 'Allow', 'Tcp', 'Grafana', 'asg', 'asg-ondemand', 'asg', 'asg-grafana']
-    
       // Admin and Deployment
       AllowWinRMIn                : ['520', 'Inbound', 'Allow', 'Tcp', 'WinRM', 'asg', 'asg-jumpbox', 'asg', 'asg-rdp']
       AllowRdpIn                  : ['550', 'Inbound', 'Allow', 'Tcp', 'Rdp', 'asg', 'asg-jumpbox', 'asg', 'asg-rdp']
@@ -532,11 +546,6 @@ var config = {
       // NFS
       AllowNfsOut                 : ['440', 'Outbound', 'Allow', '*', 'Nfs', 'asg', 'asg-nfs-client', 'subnet', 'netapp']
       AllowNfsComputeOut          : ['450', 'Outbound', 'Allow', '*', 'Nfs', 'subnet', 'compute', 'subnet', 'netapp']
-    
-      // Telegraf / Grafana
-      AllowTelegrafOut            : ['460', 'Outbound', 'Allow', 'Tcp', 'Telegraf', 'asg', 'asg-telegraf', 'asg', 'asg-grafana']
-      AllowComputeTelegrafOut     : ['470', 'Outbound', 'Allow', 'Tcp', 'Telegraf', 'subnet', 'compute', 'asg', 'asg-grafana']
-      AllowGrafanaOut             : ['480', 'Outbound', 'Allow', 'Tcp', 'Grafana', 'asg', 'asg-ondemand', 'asg', 'asg-grafana']
     
       // SSH internal rules
       AllowSshFromJumpboxOut      : ['490', 'Outbound', 'Allow', 'Tcp', 'Ssh', 'asg', 'asg-jumpbox', 'asg', 'asg-ssh']
@@ -593,6 +602,17 @@ var config = {
     gateway: {
       AllowInternalWebUsersIn     : ['540', 'Inbound', 'Allow', 'Tcp', 'Web', 'subnet', 'gateway', 'asg', 'asg-ondemand']
     }
+    grafana: {
+      // Telegraf / Grafana
+      // Inbound
+      AllowTelegrafIn             : ['490', 'Inbound', 'Allow', 'Tcp', 'Telegraf', 'asg', 'asg-telegraf', 'asg', 'asg-grafana']
+      AllowComputeTelegrafIn      : ['500', 'Inbound', 'Allow', 'Tcp', 'Telegraf', 'subnet', 'compute', 'asg', 'asg-grafana']
+      AllowGrafanaIn              : ['510', 'Inbound', 'Allow', 'Tcp', 'Grafana', 'asg', 'asg-ondemand', 'asg', 'asg-grafana']
+      // Outbound
+      AllowTelegrafOut            : ['460', 'Outbound', 'Allow', 'Tcp', 'Telegraf', 'asg', 'asg-telegraf', 'asg', 'asg-grafana']
+      AllowComputeTelegrafOut     : ['470', 'Outbound', 'Allow', 'Tcp', 'Telegraf', 'subnet', 'compute', 'asg', 'asg-grafana']
+      AllowGrafanaOut             : ['480', 'Outbound', 'Allow', 'Tcp', 'Grafana', 'asg', 'asg-ondemand', 'asg', 'asg-grafana']
+    }
   }
 }
 
@@ -620,6 +640,7 @@ module azhopNetwork './network.bicep' = {
     deployGateway: config.deploy_gateway
     deployBastion: config.deploy_bastion
     deployLustre: config.deploy_lustre
+    deployGrafana: config.deploy_grafana
     publicIp: config.public_ip
     vnet: config.vnet
     asgNames: config.asg_names
@@ -935,9 +956,6 @@ output azhopInventory object = {
         ccportal: {
           ansible_host: azhopVm[indexOf(map(vmItems, item => item.key), 'ccportal')].outputs.privateIp
         }
-        grafana: {
-          ansible_host: azhopVm[indexOf(map(vmItems, item => item.key), 'grafana')].outputs.privateIp
-        }
       },
       indexOf(map(vmItems, item => item.key), 'ad') >= 0 ? {
         ad: {
@@ -986,6 +1004,11 @@ output azhopInventory object = {
         guacamole: {
           ansible_host: azhopVm[indexOf(map(vmItems, item => item.key), 'guacamole')].outputs.privateIp
         }
+      } : {},
+      config.deploy_grafana ? {
+        grafana: {
+          ansible_host: azhopVm[indexOf(map(vmItems, item => item.key), 'grafana')].outputs.privateIp
+        }
       } : {}
     )
     vars: {
@@ -1007,6 +1030,10 @@ output azhopPackerOptions object = (config.deploy_sig) ? {
   var_virtual_network_name: config.vnet.name
   var_virtual_network_subnet_name: config.vnet.subnets.compute.name
   var_virtual_network_resource_group_name: azhopResourceGroupName
+  var_ssh_bastion_host: azhopVm[indexOf(map(vmItems, item => item.key), 'jumpbox')].outputs.privateIp // TODO: add support for public IP
+  var_ssh_bastion_port: '${config.vms.jumpbox.sshPort}'
+  var_ssh_bastion_username: config.admin_user
+  var_ssh_bastion_private_key_file: '../${config.admin_user}_id_rsa'
   var_queue_manager: config.queue_manager
 } : {}
 
