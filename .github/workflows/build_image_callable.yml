@@ -44,14 +44,14 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
          
@@ -89,14 +89,14 @@ jobs:
       matrix:
         packer_file: ${{ fromJson(needs.set_image_list.outputs.matrix) }}
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
          

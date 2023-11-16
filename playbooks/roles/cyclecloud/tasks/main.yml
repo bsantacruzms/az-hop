@@ -4,8 +4,9 @@
 - name: debug
   debug:
     msg:
-      - "cc_version={{cc_version}}"
+      - "cyclecloud_version={{cyclecloud_version}}"
       - "Distribution={{ansible_distribution}}"
+      - "Install CC={{install_cyclecloud}}"
 
 - name: mount data disk
   shell: |
@@ -21,9 +22,40 @@
     mkdir /opt/cycle_server
     echo "UUID=$disk_uuid /opt/cycle_server xfs defaults,nofail 1 2" >> /etc/fstab
     mount /opt/cycle_server
+  when: install_cyclecloud
 
 - name: Perform OS dependent configuration tasks
   include_tasks: "{{ansible_distribution}}.yml"
+  when: install_cyclecloud
+
+- name: Update Packages
+  include_role:
+    name: pkg_update
+    apply: 
+      become: true
+  vars:
+    packages_to_exclude_from_upgrade: "cyclecloud*"
+
+- name: Extract and install the CLI
+  shell: |
+    set -e
+    _tmpdir=$(mktemp -d)
+    mydir=$PWD
+    cd $_tmpdir
+    CS_ROOT=/opt/cycle_server
+    unzip $CS_ROOT/tools/cyclecloud-cli.zip
+    cd cyclecloud-cli-installer
+    ./install.sh --system -y -v
+    cd $mydir
+    # Update properties
+    sed -i 's/webServerMaxHeapSize\=2048M/webServerMaxHeapSize\=4096M/' $CS_ROOT/config/cycle_server.properties
+    sed -i 's/webServerPort\=8080/webServerPort\=80/' $CS_ROOT/config/cycle_server.properties
+    sed -i 's/webServerSslPort\=8443/webServerSslPort\=443/' $CS_ROOT/config/cycle_server.properties
+    sed -i 's/webServerEnableHttps\=false/webServerEnableHttps=true/' $CS_ROOT/config/cycle_server.properties
+    touch /opt/cycle_server/cli_installed
+  args:
+    creates: /opt/cycle_server/cli_installed
+  when: install_cyclecloud
 
 - name: Create a data record for azhop and start cycleserver
   shell: |
@@ -38,26 +70,6 @@
     #/opt/cycle_server/cycle_server execute 'update Application.Setting set Value = undefined where Name == "site_id" || Name == "reported_version"'
   args:
     creates: /opt/cycle_server/config/data/azhop.txt.imported
-
-- name: Extract and install the CLI
-  shell: |
-    set -e
-    _tmpdir=$(mktemp -d)
-    mydir=$PWD
-    cd $_tmpdir
-    CS_ROOT=/opt/cycle_server
-    unzip $CS_ROOT/tools/cyclecloud-cli.zip
-    cd cyclecloud-cli-installer
-    ./install.sh --system -y
-    cd $mydir
-    # Update properties
-    sed -i 's/webServerMaxHeapSize\=2048M/webServerMaxHeapSize\=4096M/' $CS_ROOT/config/cycle_server.properties
-    sed -i 's/webServerPort\=8080/webServerPort\=80/' $CS_ROOT/config/cycle_server.properties
-    sed -i 's/webServerSslPort\=8443/webServerSslPort\=443/' $CS_ROOT/config/cycle_server.properties
-    sed -i 's/webServerEnableHttps\=false/webServerEnableHttps=true/' $CS_ROOT/config/cycle_server.properties
-    touch /opt/cycle_server/cli_installed
-  args:
-    creates: /opt/cycle_server/cli_installed
 
 - name: stop cycle_server
   service:
@@ -95,7 +107,7 @@
   copy:
     src: '{{role_path}}/files/fabric.css'
     dest: /opt/cycle_server/system/web/static/office-ui-fabric-react/css/fabric.css
-  when: cc_version == "8.2.2-1902"
+  when: cyclecloud_version == "8.2.2-1902"
 
 - name: Configure CycleCloud CLI
   command: '/usr/local/bin/cyclecloud initialize --force --batch --name ccportal --url=https://localhost:9443/cyclecloud --verify-ssl=false --username={{cc_admin_user}} --password="{{cc_password}}"'

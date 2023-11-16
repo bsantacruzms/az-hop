@@ -21,6 +21,11 @@ alerting:
   admin_email: admin.mail@contoso.com
   local_volume_threshold: 80
 
+lustre:
+  create: "[steps('lustre').deployLustre]"
+  sku: "[steps('lustre').lustreSku]"
+  capacity: "[steps('lustre').lustreCapacity]"
+
 anf:
   create: "[equals(steps('homedir').type, 'anf')]"
   homefs_size_tb: "[if(equals(steps('homedir').type, 'anf'), steps('homedir').anfcapacity, 4)]"
@@ -41,7 +46,7 @@ mounts:
     options: "[if(equals(steps('homedir').type, 'azurefiles'), 'vers=4,minorversion=1,sec=sys', '{{anf_home_opts}}')]"
 
 admin_user: "[basics('adminUser')]"
-key_vault_readers: "[basics('keyvaultReader')]"
+key_vault_readers: "[steps('otherSettings').keyvaultReader]"
 
 network:
   create_nsg: true
@@ -68,14 +73,14 @@ network:
       gateway:
         address_prefixes: "[concat(_X1_, '.', _X2_, '.', _X3_, '.48/28')]"
         create: true
-      bastion:
+      lustre:
         address_prefixes: "[concat(_X1_, '.', _X2_, '.', _X3_, '.64/26')]"
         create: true
       compute:
         name: compute
         address_prefixes: "[concat(_X1_, '.', _X2_, '.', if(equals(steps('network').cidrPrefix, '/24'), concat(_X3_, '.128/25'), if(equals(steps('network').cidrPrefix, '/23'), concat(string(add(_X3i_,1)), '.0/24'), if(equals(steps('network').cidrPrefix, '/22'), concat(string(add(_X3i_,2)), '.0/23'), if(equals(steps('network').cidrPrefix, '/21'), concat(string(add(_X3i_,4)), '.0/22'), concat(string(add(_X3i_,8)), '.0/21'))))))]"
         create: true
-  peering: "[if(steps('network').peering, parse(concat('[{\"vnet_name\":\"', steps('network').vnetname, '\", \"vnet_resource_group\": \"', steps('network').vnetrg, '\"}]')), parse('[]'))]"
+  peering: "[if(steps('network').peering, parse(concat('[{\"vnet_name\":\"', steps('network').vnetPeeredVnetSelector.name, '\", \"vnet_resource_group\": \"', take(skip(split(steps('network').vnetPeeredVnetSelector.id,'/'),4),1), '\"}]')), parse('[]'))]"
   # This list is optional, and can be used to create VNet Peerings in the same subscription.
   #  - vnet_name: "azhop_hub" #"VNET Name to Peer to"
   #    vnet_resource_group: "azhop_control_plane_westeurope" #"Resource Group of the VNET to peer to"
@@ -84,7 +89,7 @@ locked_down_network:
   enforce: false
   public_ip: "[steps('network').publicIp]" # Enable public IP creation for Jumpbox, OnDemand and create images. Default to true
 
-linux_base_image: "OpenLogic:CentOS:7_9-gen2:latest" # publisher:offer:sku:version or image_id
+linux_base_image: almalinux:almalinux-x86_64:8_7-gen2:latest # publisher:offer:sku:version or image_id
 windows_base_image: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-smalldisk:latest" # publisher:offer:sku:version or image_id
 
 deployer:
@@ -123,7 +128,9 @@ queue_manager: "[steps('scheduler').scheduler]"
 
 slurm:
   accounting_enabled: "[if(equals(steps('scheduler').scheduler, 'slurm'), steps('scheduler').slurmAccounting, false)]"
-  slurm_version: 20.11.9
+  slurm_version: "[steps('scheduler').slurmVersion]"
+  # CycleCloud for SLURM project version as defined in https://github.com/Azure/cyclecloud-slurm/releases. Currently supported: 2.7.0-2.7.2. Default to 2.7.2
+  cyclecloud_slurm_version: 2.7.2
 
 enroot:
   enroot_version: 3.4.1
@@ -138,65 +145,49 @@ vpn_gateway:
   create: false
 
 authentication:
-  user_auth: "[steps('authentication').userAuthentication]"
+  user_auth: local #"[steps('authentication').userAuthentication]"
   httpd_auth: basic # oidc or basic
 
 autoscale:
   idle_timeout: 180 # Idle time in seconds before shutting down VMs - default to 1800 like in CycleCloud
 
 queues:
-  - name: execute
+  - name: htc
     vm_size: Standard_F2s_v2
-    max_core_count: 512
-    image: azhpc:azhop-compute:centos-7_9:latest
+    max_core_count: 128
+    image: azhpc:azhop-compute:almalinux-8_7:latest
     ColocateNodes: false
-  - name: hc44rs
-    vm_size: Standard_HC44rs
-    max_core_count: 440
-    image: azhpc:azhop-compute:centos-7_9:latest
-    EnableAcceleratedNetworking: true
-  - name: hb120v2
-    vm_size: Standard_HB120rs_v2
-    max_core_count: 1200
-    image: azhpc:azhop-compute:centos-7_9:latest
-    EnableAcceleratedNetworking: true
-  - name: hb120v3
+  - name: hpc
     vm_size: Standard_HB120rs_v3
     max_core_count: 1200
-    image: azhpc:azhop-compute:centos-7_9:latest
+    image: azhpc:azhop-compute:almalinux-8_7:latest
+    EnableAcceleratedNetworking: true
+  - name: gpu
+    vm_size: Standard_NC24ads_A100_v4
+    max_core_count: 0
+    image: azhpc:azhop-compute:almalinux-8_7:latest
     EnableAcceleratedNetworking: true
     # Queue dedicated to GPU remote viz nodes. This name is fixed and can't be changed
   - name: viz3d
     vm_size: Standard_NV12s_v3
     max_core_count: 48
     # Use the pre-built azhop image from the marketplace
-    image: azhpc:azhop-desktop:centos-7_9:latest
+    image: azhpc:azhop-desktop:almalinux-8_7:latest
     ColocateNodes: false
     EnableAcceleratedNetworking: true
     # Queue dedicated to share GPU remote viz nodes. This name is fixed and can't be changed
   - name: largeviz3d
     vm_size: Standard_NV48s_v3
     max_core_count: 96
-    image: azhpc:azhop-desktop:centos-7_9:latest
+    image: azhpc:azhop-desktop:almalinux-8_7:latest
     ColocateNodes: false
     EnableAcceleratedNetworking: true
     # Queue dedicated to non GPU remote viz nodes. This name is fixed and can't be changed
   - name: viz
     vm_size: Standard_D8s_v5
-    max_core_count: 200
-    image: azhpc:azhop-desktop:centos-7_9:latest
+    max_core_count: 0
+    image: azhpc:azhop-desktop:almalinux-8_7:latest
     ColocateNodes: false
-    EnableAcceleratedNetworking: true
-
-enable_remote_winviz: false # Set to true to enable windows remote visualization
-
-remoteviz:
-  - name: winviz # This name is fixed and can't be changed
-    vm_size: Standard_NV12s_v3 # Standard_NV8as_v4
-    max_core_count: 48
-    image: "MicrosoftWindowsDesktop:Windows-10:21h1-pron:latest"
-    ColocateNodes: false
-    spot: false
     EnableAcceleratedNetworking: true
 
 applications:
@@ -206,8 +197,6 @@ applications:
     enabled: "[steps('applications').enableJupyter]"
   bc_rstudio:
     enabled: "[steps('applications').enableRStudio]"
-  bc_ansys_workbench:
-    enabled: "[steps('applications').enableAnsysWorkbench]"
   bc_vmd:
     enabled: "[steps('applications').enableVMD]"
   bc_paraview:

@@ -77,14 +77,6 @@
                     "description": "Can be either an image reference or an image_id from the image registry or a custom managed image",
                     "type": "string"
                 },
-                "lustre_base_image": {
-                    "description": "Can be either an image reference or an image_id from the image registry or a custom managed image",
-                    "type": "string"
-                },
-                "lustre_base_plan": {
-                    "description": "The lustre plan to use. Only needed when using the default lustre image from the marketplace. use '::' for an empty plan",
-                    "type": "string"
-                },
                 "jumpbox": {
                     "description": "Jumpbox VM configuration, only needed when deploying thru a public IP and without a configured deployer VM",
                     "$ref": "#/definitions/Jumpbox"
@@ -103,15 +95,11 @@
                 },
                 "grafana": {
                     "description": "Grafana VM configuration",
-                    "$ref": "#/definitions/Cyclecloud"
-                },
-                "guacamole": {
-                    "description": "Guacamole VM configuration",
-                    "$ref": "#/definitions/Cyclecloud"
+                    "$ref": "#/definitions/Grafana"
                 },
                 "scheduler": {
                     "description": "Scheduler VM configuration",
-                    "$ref": "#/definitions/Cyclecloud"
+                    "$ref": "#/definitions/Scheduler"
                 },
                 "cyclecloud": {
                     "description": "CycleCloud VM configuration",
@@ -156,7 +144,7 @@
                     "$ref": "#/definitions/Enroot"
                 },
                 "database": {
-                    "description": "If using an existing Managed MariaDB instance for SLURM accounting and/or Guacamole, specify these values",
+                    "description": "If using an existing Managed MariaDB instance for SLURM accounting, specify these values",
                     "$ref": "#/definitions/Database"
                 },
                 "authentication": {
@@ -281,7 +269,10 @@
                 "install_agent": {"type": "boolean", "default": true, "deprecated": true },
                 "azure_monitor_agent": {"type": "boolean", "default": false },
                 "telegraf": {"type": "boolean", "default": true },
-                "grafana": {"type": "boolean", "default": true }
+                "grafana": {"type": "boolean", "default": true },
+		"idle_threshold": {"type": "string", "pattern": "^(10|20|30|40|50|60|70|80|90|100)$", "default": "70"},
+		"iowait_threshold": {"type": "string", "pattern": "^(10|20|30|40|50|60|70|80|90|100)$", "default": "40"},
+		"mem_threshold": {"type": "string", "pattern": "^(10|20|30|40|50|60|70|80|90|100)$", "default": "30"}
             },
             "title": "monitoring"
         },
@@ -306,6 +297,8 @@
                     "type": "string",
                     "description": "The size of VM to use when deploying a new active directory domain as part of AZHOP"
                 },
+                "name": { "type": "string", "default": "ad", "maxLength": 15, "pattern": "[0-9a-z\\-]+" },
+                "ha_name": { "type": "string", "default": "ad2", "maxLength": 15, "pattern": "[0-9a-z\\-]+" },
                 "hybrid_benefit": {
                     "type": "boolean",
                     "description": "Will hybrid benefit be used on the vm that is running the active directory domain vm being deployed for az-hop.",
@@ -317,8 +310,7 @@
                     "default": false
                 }
             },
-            "required": [
-            ],
+            "required": [],
             "title": "az-hopAd"
         },
         "Anf": {
@@ -590,6 +582,7 @@
             "additionalProperties": false,
             "properties": {
                 "vm_size": { "type": "string" },
+                "name": { "type": "string", "default": "ccportal", "maxLength": 15, "pattern": "[0-9a-z\\-]+" },
                 "version": { "type": "string" },
                 "image": {
                     "description": "Can be either an image reference or an image_id from the image registry or a custom managed image",
@@ -672,6 +665,9 @@
                 "vm_size": {
                     "type": "string"
                 },
+                "name": {
+                    "type": "string", "default": "jumpbox", "maxLength": 15, "pattern": "[0-9a-z\\-]+"
+                },
                 "ssh_port": {
                     "description": "Defaults to 22. Change this to, e.g., 2222, if security policies (like 'zero trust') in your tenant automatically block access to port 22 from the internet",
                     "type": "integer"
@@ -688,6 +684,9 @@
             "properties": {
                 "vm_size": {
                     "type": "string"
+                },
+                "name": {
+                    "type": "string", "default": "deployer", "maxLength": 15, "pattern": "[0-9a-z\\-]+"
                 },
                 "ssh_port": {
                     "description": "Defaults to 22. Change this to, e.g., 2222, if security policies (like 'zero trust') in your tenant automatically block access to port 22 from the internet",
@@ -708,33 +707,14 @@
                     "type": "boolean",
                     "default": false
                 },
-                "rbh_sku": {
-                    "description": "",
+                "sku": {
+                    "description": "The Lustre tier to use",
+                    "enum": ["AMLFS-Durable-Premium-40", "AMLFS-Durable-Premium-120", "AMLFS-Durable-Premium-250", "AMLFS-Durable-Premium-500"],
                     "type": "string"
                 },
-                "mds_sku": {
-                    "description": "",
-                    "type": "string"
-                },
-                "oss_sku": {
-                    "description": "",
-                    "type": "string"
-                },
-                "oss_count": {
-                    "description": "",
+                "capacity": {
+                    "description": "Size of the Lustre file system in TB",
                     "type": "integer"
-                },
-                "hsm_max_requests": {
-                    "description": "",
-                    "type": "integer"
-                },
-                "mdt_device": {
-                    "description": "",
-                    "type": "string"
-                },
-                "ost_device": {
-                    "description": "",
-                    "type": "string"
                 },
                 "hsm": {
                     "description": "Use existing storage account for the archive (optional). If not included, will use az-hop storage account.",
@@ -879,7 +859,6 @@
                 "asg-jumpbox": { "type": "string" },
                 "asg-ad": { "type": "string" },
                 "asg-ad-client": { "type": "string" },
-                "asg-lustre": { "type": "string" },
                 "asg-lustre-client": { "type": "string" },
                 "asg-pbs": { "type": "string" },
                 "asg-pbs-client": { "type": "string" },
@@ -891,7 +870,6 @@
                 "asg-robinhood": { "type": "string" },
                 "asg-ondemand": { "type": "string" },
                 "asg-deployer": { "type": "string" },
-                "asg-guacamole": { "type": "string" },
                 "asg-mariadb-client": { "type": "string" }
             },
             "title": "ASG Mapping Names"
@@ -986,6 +964,9 @@
                 "bastion": {
                     "$ref": "#/definitions/subnetClass"
                 },
+                "lustre": {
+                    "$ref": "#/definitions/subnetClass"
+                },
                 "gateway": {
                     "$ref": "#/definitions/subnetClass"
                 },
@@ -1024,6 +1005,7 @@
             "additionalProperties": false,
             "properties": {
                 "vm_size": { "type": "string" },
+                "name": { "type": "string", "default": "ondemand", "maxLength": 15, "pattern": "[0-9a-z\\-]+" },
                 "generate_certificate": { "type": "boolean", "default": true },
                 "fqdn": { "type": "string" }
             },
@@ -1031,6 +1013,30 @@
                 "vm_size"
             ],
             "title": "Ondemand"
+        },
+        "Scheduler": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "vm_size": { "type": "string" },
+                "name": { "type": "string", "default": "scheduler", "maxLength": 15, "pattern": "[0-9a-z\\-]+" }
+            },
+            "required": [
+                "vm_size"
+            ],
+            "title": "Scheduler"
+        },
+        "Grafana": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "vm_size": { "type": "string" },
+                "name": { "type": "string", "default": "grafana", "maxLength": 15, "pattern": "[0-9a-z\\-]+" }
+            },
+            "required": [
+                "vm_size"
+            ],
+            "title": "Grafana"
         },
         "Queue": {
             "type": "object",
@@ -1133,14 +1139,15 @@
                 },
                 "slurm_version": {
                     "type": "string",
-                    "enum": ["20.11.9", "22.05.3"],
-                    "description": "SLURM version to install. Currently supported: only 20.11.9 and 22.05.3."
+                    "enum": ["20.11.9", "22.05.3", "22.05.9", "23.02.5"],
+                    "default": "22.05.9",
+                    "description": "SLURM version to install. Currently supported: only [20.11.9 | 22.05.3] with cyclecloud_slurm_version==2.7.x and [22.05.9 | 23.02.5] with cyclecloud_slurm_version==3.0.x."
                 },
                 "cyclecloud_slurm_version": {
                     "type": "string",
-                    "enum": ["2.7.0", "2.7.1"],
-                    "default": "2.7.1",
-                    "description": "CycleCloud for SLURM project version as defined in https://github.com/Azure/cyclecloud-slurm/releases. Currently supported: only 2.7.0 and 2.7.1."
+                    "enum": ["2.7.0", "2.7.1", "2.7.2", "3.0.4"],
+                    "default": "3.0.4",
+                    "description": "CycleCloud for SLURM project version as defined in https://github.com/Azure/cyclecloud-slurm/releases. Currently supported: 2.7.0-2.7.2, 3.0.4."
                 }
             },
             "required": [

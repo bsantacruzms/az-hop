@@ -110,10 +110,6 @@ Once deployed, you can connect to the OnDemand web portal via:
   - **"Reader"** on the subscription
 - Your subscription need to be registered for NetApp resource provider as explained [here](https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-register#waitlist)
 - If using ANF Dual Protocol be aware of the limitation of one ANF account allow to be domain joined per region in the same subscription
-- If deploying a Lustre Cluster, the Azure HPC Lustre marketplace image terms need to be accepted
-```bash
-az vm image terms accept --offer azurehpc-lustre --publisher azhpc --plan azurehpc-lustre-2_12
-```
 - If AlmaLinux Marketplace image is used, the terms need to be accepted as well
 ```bash
 az vm image terms accept --offer almalinux-hpc --publisher almalinux --plan 8_5-hpc-gen2
@@ -124,9 +120,6 @@ az vm image terms accept --offer almalinux-hpc --publisher almalinux --plan 8_5-
     - 5 x Standard_B2ms
   - 4 cores of Standard DSv5 Family
     - 1 x Standard_D4s_v5
-  - 80 cores of Standard DDv4 Family when deploying a Lustre Cluster
-    - 2 x Standard_D8d_v4
-    - 2 x Standard_D32d_v4
 - For the compute and visualization nodes, you can adjust the maximum quota in your configuration file but make sure you have quota for these instances too :
   - For Code Server :
     - 10 cores of Standard FSv2 Family
@@ -134,6 +127,7 @@ az vm image terms accept --offer almalinux-hpc --publisher almalinux --plan 8_5-
     - 220 cores Standard_HC44rs
     - and/or 600 cores of Standard HBrsv2 Family
     - and/or 600 cores of Standard HBv3 Family
+    - and/or 96 cores of Standard NCADS_A100_v4 Family
   - For Remote Visualization
     - 24 cores of Standard NVs_v3 Family
 
@@ -278,7 +272,7 @@ Run the `install.sh` script:
 | ad | 10.0.0.8/**29** | 10.0.0.8 - 10.0.0.15 | 8 | 10.0.0.12 | 3 |
 | admin | 10.0.0.16/**28** | 10.0.0.16 - 10.0.0.31 | 16 | 10.0.0.20 | 11 |
 | netapp | 10.0.0.32/**28** | 10.0.0.32 - 10.0.0.47 | 16 | 10.0.0.36 | 11 |
-| gateway or outbounddns | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
+| gateway or outbounddns or lustre | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
 | bastion | 10.0.0.64/**26** | 10.0.0.64 - 10.0.0.127 | 64 | 10.0.0.64 | 59 |
 | compute | 10.0.0.128/**25** | 10.0.0.128 - 10.0.0.255 | 128 | 10.0.0.132 | 123 |
 
@@ -294,7 +288,8 @@ Run the `install.sh` script:
 | netapp | 10.0.0.32/**28** | 10.0.0.32 - 10.0.0.47 | 16 | 10.0.0.36 | 11 |
 | outbounddns | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
 | bastion | 10.0.0.64/**26** | 10.0.0.64 - 10.0.0.127 | 64 | 10.0.0.64 | 59 |
-| gateway | 10.0.0.128/**27** | 10.0.0.128 - 10.0.0.159 | 32 | 10.0.0.48 | 27 |
+| lustre | 10.0.0.128/**26** | 10.0.0.128 - 10.0.0.191 | 64 | 10.0.0.64 | 59 |
+| gateway | 10.0.0.192/**27** | 10.0.0.192 - 10.0.0.223 | 32 | 10.0.0.48 | 27 |
 | empty | | | | | |
 | compute | 10.0.1.0/**24** | 10.0.1.0 - 10.0.1.255 | 256 | 10.0.1.0 | 251 |
 
@@ -308,7 +303,8 @@ Run the `install.sh` script:
 | netapp | 10.0.0.32/**28** | 10.0.0.32 - 10.0.0.47 | 16 | 10.0.0.36 | 11 |
 | outbounddns | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
 | bastion | 10.0.0.64/**26** | 10.0.0.64 - 10.0.0.127 | 64 | 10.0.0.64 | 59 |
-| gateway | 10.0.0.128/**27** | 10.0.0.128 - 10.0.0.159 | 32 | 10.0.0.48 | 27 |
+| lustre | 10.0.0.128/**26** | 10.0.0.128 - 10.0.0.191 | 64 | 10.0.0.64 | 59 |
+| gateway | 10.0.0.192/**27** | 10.0.0.192 - 10.0.0.223 | 32 | 10.0.0.48 | 27 |
 | empty | | | | | |
 | compute | 10.0.2.0/**23** | 10.0.2.0 - 10.0.3.255 | 512 | 10.0.2.0 | 507 |
 
@@ -322,7 +318,8 @@ Run the `install.sh` script:
 | netapp | 10.0.0.32/**28** | 10.0.0.32 - 10.0.0.47 | 16 | 10.0.0.36 | 11 |
 | outbounddns | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
 | bastion | 10.0.0.64/**26** | 10.0.0.64 - 10.0.0.127 | 64 | 10.0.0.64 | 59 |
-| gateway | 10.0.0.128/**27** | 10.0.0.128 - 10.0.0.159 | 32 | 10.0.0.48 | 27 |
+| lustre | 10.0.0.128/**26** | 10.0.0.128 - 10.0.0.191 | 64 | 10.0.0.64 | 59 |
+| gateway | 10.0.0.192/**27** | 10.0.0.192 - 10.0.0.223 | 32 | 10.0.0.48 | 27 |
 | empty | | | | | |
 | compute | 10.0.4.0/**22** | 10.0.4.0 - 10.0.7.255 | 1024 | 10.0.4.0 | 1019 |
 
@@ -336,7 +333,8 @@ Run the `install.sh` script:
 | netapp | 10.0.0.32/**28** | 10.0.0.32 - 10.0.0.47 | 16 | 10.0.0.36 | 11 |
 | outbounddns | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
 | bastion | 10.0.0.64/**26** | 10.0.0.64 - 10.0.0.127 | 64 | 10.0.0.64 | 59 |
-| gateway | 10.0.0.128/**27** | 10.0.0.128 - 10.0.0.159 | 32 | 10.0.0.48 | 27 |
+| lustre | 10.0.0.128/**26** | 10.0.0.128 - 10.0.0.191 | 64 | 10.0.0.64 | 59 |
+| gateway | 10.0.0.192/**27** | 10.0.0.192 - 10.0.0.223 | 32 | 10.0.0.48 | 27 |
 | empty | | | | | |
 | compute | 10.0.8.0/**21** | 10.0.8.0 - 10.0.15.255 | 2048 | 10.0.8.0 | 2043 |
 
@@ -350,7 +348,8 @@ Run the `install.sh` script:
 | netapp | 10.0.0.32/**28** | 10.0.0.32 - 10.0.0.47 | 16 | 10.0.0.36 | 11 |
 | outbounddns | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
 | bastion | 10.0.0.64/**26** | 10.0.0.64 - 10.0.0.127 | 64 | 10.0.0.64 | 59 |
-| gateway | 10.0.0.128/**27** | 10.0.0.128 - 10.0.0.159 | 32 | 10.0.0.48 | 27 |
+| lustre | 10.0.0.128/**26** | 10.0.0.128 - 10.0.0.191 | 64 | 10.0.0.64 | 59 |
+| gateway | 10.0.0.192/**27** | 10.0.0.192 - 10.0.0.223 | 32 | 10.0.0.48 | 27 |
 | empty | | | | | |
 | compute | 10.0.16.0/**20** | 10.0.16.0 - 10.0.31.255 | 4096 | 10.0.16.0 | 4091 |
 
@@ -364,7 +363,8 @@ Run the `install.sh` script:
 | netapp | 10.0.0.32/**28** | 10.0.0.32 - 10.0.0.47 | 16 | 10.0.0.36 | 11 |
 | outbounddns | 10.0.0.48/**28** | 10.0.0.48 - 10.0.0.63 | 16 | 10.0.0.48 | 11 |
 | bastion | 10.0.0.64/**26** | 10.0.0.64 - 10.0.0.127 | 64 | 10.0.0.64 | 59 |
-| gateway | 10.0.0.128/**27** | 10.0.0.128 - 10.0.0.159 | 32 | 10.0.0.48 | 27 |
+| lustre | 10.0.0.128/**26** | 10.0.0.128 - 10.0.0.191 | 64 | 10.0.0.64 | 59 |
+| gateway | 10.0.0.192/**27** | 10.0.0.192 - 10.0.0.223 | 32 | 10.0.0.48 | 27 |
 | empty | | | | | |
 | compute | 10.0.32.0/**19** | 10.0.32.0 - 10.0.63.255 | 8192 | 10.0.32.0 | 8187 |
 
@@ -427,6 +427,19 @@ anf:
 azurefiles:
   create: false
   size_gb: 1024
+
+# Section to create lustre filesystem.  Only available with bicep deployment.
+lustre:
+  create: false
+  # Options: AMLFS-Durable-Premium-40, AMLFS-Durable-Premium-125, AMLFS-Durable-Premium-250, AMLFS-Durable-Premium-500
+  # See documentation for more details: https://learn.microsoft.com/en-us/azure/azure-managed-lustre/create-file-system-resource-manager
+  sku: AMLFS-Durable-Premium-250
+  # The step sizes are dependent on the SKU.
+  # - AMLFS-Durable-Premium-40: 48TB
+  # - AMLFS-Durable-Premium-125: 16TB
+  # - AMLFS-Durable-Premium-250: 8TB
+  # - AMLFS-Durable-Premium-500: 4TB
+  capacity: 8
 
 # These mounts will be listed in the Files menu of the OnDemand portal and automatically mounted on all compute nodes and remote desktop nodes
 mounts:
@@ -517,7 +530,6 @@ network:
 #     asg-robinhood: asg-robinhood
 #     asg-ondemand: asg-ondemand
 #     asg-deployer: asg-deployer
-#     asg-guacamole: asg-guacamole
 #     asg-mariadb-client: asg-mariadb-client
     
 #  peering: # This list is optional, and can be used to create VNet Peerings in the same subscription.
@@ -537,6 +549,8 @@ locked_down_network:
   public_ip: true # Enable public IP creation for Jumpbox, OnDemand and create images. Default to true
 
 # Base image configuration. Can be either an image reference or an image_id from the image registry or a custom managed image
+# For AlmaLinux 8.7 use almalinux:almalinux-x86_64:8_7-gen2:latest
+# For CentOS 7.9 use OpenLogic:CentOS:7_9-gen2:latest
 linux_base_image: "OpenLogic:CentOS:7_9-gen2:latest" # publisher:offer:sku:version or image_id
 # linux image plan if required, format is publisher:product:name
 #linux_base_plan:
@@ -576,30 +590,32 @@ jumpbox:
   #ssh_port: 2222
 # Active directory VM configuration
 ad:
+  name: ad
   vm_size: Standard_B2ms
   hybrid_benefit: false # Enable hybrid benefit for AD, default to false
-  high_availability: false # Build AD in High Availability mode (2 Domain Controllers) - default to false
+  high_availability: false # Build AD in High Availability mode (2 Domain Controlers) - default to false
+  ha_name: ad2 # name of the HA AD machine when high_availability=true
 # On demand VM configuration
 ondemand:
+  name: ondemand # When provided, it will be used as the name of the VM. Default to ondemand
   vm_size: Standard_D4s_v5
   #fqdn: azhop.foo.com # When provided it will be used for the certificate server name
   generate_certificate: true # Generate an SSL certificate for the OnDemand portal. Default to true
 # Grafana VM configuration
 grafana:
   vm_size: Standard_B2ms
-# Guacamole VM configuration
-guacamole:
-  vm_size: Standard_B2ms
 # Scheduler VM configuration
 scheduler:
+  name: scheduler # When provided, it will be used as the name of the scheduler VM. Default to scheduler
   vm_size: Standard_B2ms
 # CycleCloud VM configuration
 cyclecloud:
+  name: ccportal # When provided, it will be used as the name of the CycleCloud VM. Default to ccportal
   vm_size: Standard_B2ms
   # Optional: use Ubuntu for the CycleCloud VM (default: linux_base_image)
   # image: "canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest"
   # plan: publisher:product:name
-  # version: 8.4.0-3122 # to specify a specific version, see https://packages.microsoft.com/yumrepos/cyclecloud/
+  # version: # to specify a specific version, see https://packages.microsoft.com/yumrepos/cyclecloud/
 
 # Lustre cluster is optional and can be used to create a Lustre cluster in the environment.
 lustre:
@@ -656,7 +672,6 @@ slurm:
   # Enable SLURM accounting, this will create a SLURM accounting database in a managed MariaDB server instance
   accounting_enabled: false
   # SLURM version to install. Currently supported: only 20.11.9 and 22.05.3.
-  # Other versions can be installed by building from source (See build_rpms setting in the slurmserver role)
   slurm_version: 20.11.9
   # CycleCloud for SLURM project version as defined in https://github.com/Azure/cyclecloud-slurm/releases. Currently supported: only 2.7.0 and 2.7.1. Default to 2.7.1
   cyclecloud_slurm_version: 2.7.1
@@ -672,7 +687,7 @@ enroot:
 database:
   # Name of the Azure database resource to be created. If not provided, a name will be generated
   name: custom_mariadb_name
-  # If using an existing Managed MariaDB instance for SLURM accounting and/or Guacamole, specify these values
+  # If using an existing Managed MariaDB instance for SLURM accounting, specify these values
   # Admin user of the database for which the password will be retrieved from the azhop keyvault
   user: sqladmin
   # FQDN of the managed instance
@@ -708,6 +723,7 @@ authentication:
   #   OIDCPassIDTokenAs: # for AAD use 'serialized'
   #   OIDCPassRefreshToken: # for AAD use 'On'
   #   OIDCPassClaimsAs: # for AAD use 'environment'
+  #   OIDCStateMaxNumberOfCookies: # in case of too many connections error for the same user set this to [10, true]
 
 image_gallery:
   create: true # Create the shared image gallery to store custom images
@@ -773,13 +789,6 @@ images:
     hyper_v: V2
     os_type: Linux
     version: 7.9
-  - name: azhop-compute-ubuntu-1804
-    publisher: azhpc
-    offer: azhop-compute
-    sku: ubuntu-1804
-    hyper_v: V2
-    os_type: Linux
-    version: 18.04
   - name: azhop-win10
     publisher: azhop
     offer: Windows-10
@@ -803,7 +812,7 @@ autoscale:
 # List of queues (node arrays in Cycle) to be defined
 # don't use queue names longer than 8 characters in order to leave space for node suffix, as hostnames are limited to 15 chars due to domain join and NETBIOS constraints.
 queues:
-  - name: execute # name of the Cycle Cloud node array
+  - name: htc # name of the Cycle Cloud node array
     # Azure VM Instance type
     vm_size: Standard_F2s_v2
     # maximum number of cores that can be instantiated
@@ -825,23 +834,15 @@ queues:
     # Set the max number of vm's in a VMSS; requires additional limit raise through support ticket for >100; 
     # 100 is default value; lower numbers will improve scaling for single node jobs or jobs with small number of nodes
     MaxScaleSetSize: 100
-  - name: hc44rs
-    vm_size: Standard_HC44rs
-    max_core_count: 440
-    image: azhpc:azhop-compute:centos-7_9:latest
-    spot: true
-    EnableAcceleratedNetworking: true
-  - name: hb120v2
-    vm_size: Standard_HB120rs_v2
-    max_core_count: 1200
-    image: azhpc:azhop-compute:centos-7_9:latest
-    spot: true
-    EnableAcceleratedNetworking: true
-  - name: hb120v3
+  - name: hpc
     vm_size: Standard_HB120rs_v3
     max_core_count: 1200
     image: azhpc:azhop-compute:centos-7_9:latest
-    spot: true
+    EnableAcceleratedNetworking: true
+  - name: gpu
+    vm_size: Standard_NC24ads_A100_v4
+    max_core_count: 0
+    image: azhpc:azhop-compute:centos-7_9:latest
     EnableAcceleratedNetworking: true
     # Queue dedicated to GPU remote viz nodes. This name is fixed and can't be changed
   - name: viz3d
@@ -852,7 +853,6 @@ queues:
     # Use this image ID when building your own custom images
     #image: /subscriptions/{{subscription_id}}/resourceGroups/{{resource_group}}/providers/Microsoft.Compute/galleries/{{sig_name}}/images/azhop-centos79-desktop3d/latest
     ColocateNodes: false
-    spot: false
     EnableAcceleratedNetworking: true
     max_hours: 12 # Maximum session duration
     min_hours: 1 # Minimum session duration - 0 is infinite
@@ -863,7 +863,6 @@ queues:
     image: azhpc:azhop-desktop:centos-7_9:latest
     ColocateNodes: false
     EnableAcceleratedNetworking: true
-    spot: false
     max_hours: 12
     min_hours: 1
     # Queue dedicated to non GPU remote viz nodes. This name is fixed and can't be changed
@@ -872,22 +871,9 @@ queues:
     max_core_count: 200
     image: azhpc:azhop-desktop:centos-7_9:latest
     ColocateNodes: false
-    spot: false
     EnableAcceleratedNetworking: true
     max_hours: 12
     min_hours: 1
-
-# Remote Visualization definitions
-enable_remote_winviz: false # Set to true to enable windows remote visualization
-
-remoteviz:
-  - name: winviz # This name is fixed and can't be changed
-    vm_size: Standard_NV12s_v3 # Standard_NV8as_v4 Only NVsv3 and NVsV4 are supported
-    max_core_count: 48
-    image: "MicrosoftWindowsDesktop:Windows-10:21h1-pron:latest"
-    ColocateNodes: false
-    spot: false
-    EnableAcceleratedNetworking: true
 
 # Application settings
 applications:
@@ -1163,7 +1149,7 @@ To specify the new custom images to use, just comment the default `image: azhpc:
 *Before the update*
 ```yml
 queues:
-  - name: hb120v3
+  - name: hpc
     vm_size: Standard_HB120rs_v3
     max_core_count: 1200
     image: azhpc:azhop-compute:centos-7_9:latest
@@ -1180,7 +1166,7 @@ queues:
 *After the update*
 ```yml
 queues:
-  - name: hb120v3
+  - name: hpc
     vm_size: Standard_HB120rs_v3
     max_core_count: 1200
 #    image: azhpc:azhop-compute:centos-7_9:latest
@@ -1547,7 +1533,7 @@ This script need to be run before the `install.sh` or at least before the `ood` 
 An existing instance of an Azure Database for MariaDB server can be used to store the Slurm accounting data and/or the Windows Remote Desktop session requests. To enable it update the configuration file with these settings :
 
 ```yml
-# If using an existing Managed MariaDB instance for Slurm accounting and/or Guacamole, specify these values
+# If using an existing Managed MariaDB instance for Slurm accounting, specify these values
 database:
   # Admin user of the database for which the password will be retrieved from the azhop keyvault
   user: sqladmin

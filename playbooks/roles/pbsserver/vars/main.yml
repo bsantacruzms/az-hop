@@ -1,2 +1,2 @@
 cyclecloud_pbspro: 2.0.19
-openpbs_version: 19.1.1
+ccportal_name: "{{cyclecloud.name | default('ccportal')}}"

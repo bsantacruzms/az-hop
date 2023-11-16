@@ -1,0 +1,61 @@
+---
+- name: Disable SELinux
+  selinux:
+    state: disabled
+  register: selinux
+
+# - name: reboot 
+#   reboot:
+#   when: selinux.reboot_required 
+
+- name: install AZ CLI repo (AlmaLinux)
+  shell: |
+    set -e
+    rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    cat > /etc/yum.repos.d/azure-cli.repo <<EOF
+    [azure-cli]
+    name=Azure CLI
+    baseurl=https://packages.microsoft.com/yumrepos/azure-cli
+    enabled=1
+    gpgcheck=1
+    gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+    EOF
+  args:
+    creates: /etc/yum.repos.d/azure-cli.repo
+
+- name: install CycleCloud repo
+  shell: |
+    cat > /etc/yum.repos.d/cyclecloud.repo <<EOF
+    [cyclecloud]
+    name=cyclecloud
+    baseurl=https://packages.microsoft.com/yumrepos/cyclecloud
+    gpgcheck=1
+    gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+    EOF
+  args:
+    creates: /etc/yum.repos.d/cyclecloud.repo
+
+- name: Install pre-reqs packages
+  yum:
+    name: azure-cli, dnsmasq, unzip, java, python39, python39-pip
+    state: present
+    lock_timeout : 180
+
+- name: Upgrade PIP
+  shell: |
+    set -e
+    alternatives --set python /usr/bin/python3.9
+    alternatives --set python3 /usr/bin/python3.9
+    python3 -m pip install --upgrade pip
+
+- name: Install CycleCloud
+  yum:
+    name: "cyclecloud8-{{cyclecloud_version}}"
+    state: present
+    lock_timeout : 180
+
+- name: Install Jetpack
+  yum:
+    name: "jetpack8-{{cyclecloud_version}}"
+    state: present
+    lock_timeout : 180

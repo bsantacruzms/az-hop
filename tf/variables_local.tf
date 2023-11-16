@@ -109,15 +109,13 @@ locals {
     domain_join_password  = local.use_existing_ad ? data.azurerm_key_vault_secret.domain_join_password[0].value : random_password.password.result
     domain_join_ou        = local.use_existing_ad ? local.configuration_yml["domain"].domain_join_ou : "CN=Computers"
     ad_ha                 = try(local.configuration_yml["ad"].high_availability, false)
-    domain_controlers     = local.use_existing_ad ? zipmap(local.configuration_yml["domain"].existing_dc_details.domain_controller_names, local.configuration_yml["domain"].existing_dc_details.domain_controller_names) : (local.ad_ha ? {ad="ad", ad2="ad2"} : {ad="ad"})
-    ldap_server           = local.use_existing_ad ? local.configuration_yml["domain"].existing_dc_details.domain_controller_names[0]     : "ad"
+    domain_controlers     = local.use_existing_ad ? zipmap(local.configuration_yml["domain"].existing_dc_details.domain_controller_names, local.configuration_yml["domain"].existing_dc_details.domain_controller_names) : (local.ad_ha ? {ad=local.ad_name, ad2=local.ad2_name} : {ad=local.ad_name})
+    ldap_server           = local.use_existing_ad ? local.configuration_yml["domain"].existing_dc_details.domain_controller_names[0]     : local.ad_name
     private_dns_servers   = local.use_existing_ad ? local.configuration_yml["domain"].existing_dc_details.private_dns_servers            : (local.create_ad ? (local.ad_ha ? [azurerm_network_interface.ad-nic[0].private_ip_address, azurerm_network_interface.ad2-nic[0].private_ip_address] : [azurerm_network_interface.ad-nic[0].private_ip_address]) : [])
     domain_controller_ips = local.use_existing_ad ? local.configuration_yml["domain"].existing_dc_details.domain_controller_ip_addresses : (local.create_ad ? (local.ad_ha ? [azurerm_network_interface.ad-nic[0].private_ip_address, azurerm_network_interface.ad2-nic[0].private_ip_address] : [azurerm_network_interface.ad-nic[0].private_ip_address]) : [])
 
     # Use a linux custom image reference if the linux_base_image is defined and contains ":"
     use_linux_image_reference = try(length(split(":", local.configuration_yml["linux_base_image"])[1])>0, false)
-    # Use a lustre custom image reference if the lustre_base_image is defined and contains ":"
-    use_lustre_image_reference = try(length(split(":", local.configuration_yml["lustre_base_image"])[1])>0, false)
     # Use a linux custom image reference if the linux_base_image is defined and contains ":"
     use_windows_image_reference = try(length(split(":", local.configuration_yml["windows_base_image"])[1])>0, false)
     # Use a linux custom image reference if the linux_base_image is defined and contains ":"
@@ -129,12 +127,6 @@ locals {
         sku       = local.use_linux_image_reference ? split(":", local.configuration_yml["linux_base_image"])[2] : "7_9-gen2"
         version   = local.use_linux_image_reference ? split(":", local.configuration_yml["linux_base_image"])[3] : "latest"
     }
-    lustre_base_image_reference = {
-        publisher = local.use_lustre_image_reference ? split(":", local.configuration_yml["lustre_base_image"])[0] : "azhpc"
-        offer     = local.use_lustre_image_reference ? split(":", local.configuration_yml["lustre_base_image"])[1] : "azurehpc-lustre"
-        sku       = local.use_lustre_image_reference ? split(":", local.configuration_yml["lustre_base_image"])[2] : "azurehpc-lustre-2_12"
-        version   = local.use_lustre_image_reference ? split(":", local.configuration_yml["lustre_base_image"])[3] : "latest"
-    }
     windows_base_image_reference = {
         publisher = local.use_windows_image_reference ? split(":", local.configuration_yml["windows_base_image"])[0] : "MicrosoftWindowsServer"
         offer     = local.use_windows_image_reference ? split(":", local.configuration_yml["windows_base_image"])[1] : "WindowsServer"
@@ -142,19 +134,15 @@ locals {
         version   = local.use_windows_image_reference ? split(":", local.configuration_yml["windows_base_image"])[3] : "latest"
     }
     cyclecloud_image_reference = {
-        publisher = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[0] : "OpenLogic"
-        offer     = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[1] : "CentOS"
-        sku       = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[2] : "7_9-gen2"
-        version   = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[3] : "latest"
+        publisher = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[0] : local.linux_base_image_reference.publisher
+        offer     = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[1] : local.linux_base_image_reference.offer
+        sku       = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[2] : local.linux_base_image_reference.sku
+        version   = local.use_cyclecloud_image_reference ? split(":", local.configuration_yml["cyclecloud"]["image"])[3] : local.linux_base_image_reference.version
     }
 
     # Use a linux custom image id if the linux_base_image is defined and contains "/"
     use_linux_image_id = try(length(split("/", local.configuration_yml["linux_base_image"])[1])>0, false)
     linux_image_id = local.use_linux_image_id ? local.configuration_yml["linux_base_image"] : null
-
-    # Use a lustre custom image id if the lustre_base_image is defined and contains "/"
-    use_lustre_image_id = try(length(split("/", local.configuration_yml["lustre_base_image"])[1])>0, false)
-    lustre_image_id = local.use_lustre_image_id ? local.configuration_yml["lustre_base_image"] : null
 
     # Use a windows custom image id if the windows_base_image is defined and contains "/"
     use_windows_image_id = try(length(split("/", local.configuration_yml["windows_base_image"])[1])>0, false)
@@ -171,13 +159,6 @@ locals {
         name      = try(split(":", local.configuration_yml["linux_base_plan"])[2], "")
     }
     linux_image_plan = try( length(local._linux_base_image_plan.publisher) > 0 ? local._linux_base_image_plan : local._empty_image_plan, local._empty_image_plan)
-
-    _lustre_base_image_plan = {
-        publisher = try(split(":", local.configuration_yml["lustre_base_plan"])[0], "azhpc")
-        product   = try(split(":", local.configuration_yml["lustre_base_plan"])[1], "azurehpc-lustre")
-        name      = try(split(":", local.configuration_yml["lustre_base_plan"])[2], "azurehpc-lustre-2_12")
-    }
-    lustre_image_plan = try( length(local._lustre_base_image_plan.publisher) > 0 ? local._lustre_base_image_plan : local._empty_image_plan, local._empty_image_plan)
 
     _cyclecloud_image_plan = {
         publisher = try(split(":", local.configuration_yml["cyclecloud"]["plan"])[0], "")
@@ -212,30 +193,31 @@ locals {
     admin_username = local.configuration_yml["admin_user"]
     key_vault_readers = try(local.configuration_yml["key_vault_readers"], null)
 
+    # Resource names
+    scheduler_name = try(local.configuration_yml["scheduler"]["name"], "scheduler")
+    ccportal_name = try(local.configuration_yml["cyclecloud"]["name"], "ccportal")
+    ondemand_name = try(local.configuration_yml["ondemand"]["name"], "ondemand")
+    grafana_name = try(local.configuration_yml["grafana"]["name"], "grafana")
+    jumpbox_name = try(local.configuration_yml["jumpbox"]["name"], "jumpbox")
+    ad_name = try(local.configuration_yml["ad"]["name"], "ad")
+    ad2_name = try(local.configuration_yml["ad"]["ha_name"], "ad2")
+
     key_vault_name = try(local.configuration_yml["azure_key_vault"]["name"], format("%s%s", "kv", random_string.resource_postfix.result))
     storage_account_name = try(local.configuration_yml["azure_storage_account"]["name"], "azhop${random_string.resource_postfix.result}")
     mariadb_name = try(local.configuration_yml["database"]["name"], "azhop-${random_string.resource_postfix.result}")
 
-    # Lustre
-    lustre_enabled = try(local.configuration_yml["lustre"]["create"], false)
-    lustre_archive_account = try(local.configuration_yml["lustre"]["hsm"]["storage_account"], null)
-    lustre_rbh_sku = try(local.configuration_yml["lustre"]["rbh_sku"], "Standard_D8d_v4")
-    lustre_mds_sku = try(local.configuration_yml["lustre"]["mds_sku"], "Standard_D8d_v4")
-    lustre_oss_sku = try(local.configuration_yml["lustre"]["oss_sku"], "Standard_D32d_v4")
-    lustre_oss_count = try(local.configuration_yml["lustre"]["oss_count"], local.lustre_enabled ? 2 : 0)
+    # Lustre - AMLFS not implemented for TF
+    lustre_enabled = false
 
     # Use a jumpbox when defined
     jumpbox_enabled = try(length(local.configuration_yml["jumpbox"]) > 0, false)
-    # Enable Windows Remote Visualization scenarios
-    enable_remote_winviz = try(local.configuration_yml["enable_remote_winviz"], false)
 
     # Queue manager
     queue_manager = try(local.configuration_yml["queue_manager"], "openpbs")
 
     # Create Database
-    create_database  = ( local.enable_remote_winviz || try(local.configuration_yml["slurm"].accounting_enabled, false) ) && (! local.use_existing_database)
+    create_database  = ( try(local.configuration_yml["slurm"].accounting_enabled, false) ) && (! local.use_existing_database)
     use_existing_database = try(length(local.configuration_yml["database"].fqdn) > 0 ? true : false, false)
-#    slurm_accounting = local.enable_remote_winviz || try(local.configuration_yml["slurm"].accounting_enabled, false)
     database_user = local.create_database ? "sqladmin" : (local.use_existing_database ? try(local.configuration_yml["database"].user, "") : "")
     mariadb_private_dns_zone = local.azure_endpoints[local.azure_environment].MariaDBPrivateLink
 
@@ -303,7 +285,6 @@ locals {
         asg-jumpbox = "asg-jumpbox"
         asg-ad = "asg-ad"
         asg-ad-client = "asg-ad-client"
-        asg-lustre = "asg-lustre"
         asg-lustre-client = "asg-lustre-client"
         asg-pbs = "asg-pbs"
         asg-pbs-client = "asg-pbs-client"
@@ -315,7 +296,6 @@ locals {
         asg-robinhood = "asg-robinhood"
         asg-ondemand = "asg-ondemand"
         asg-deployer = "asg-deployer"
-        asg-guacamole = "asg-guacamole"
         asg-mariadb-client = "asg-mariadb-client"
     }
     #asgs = local.create_nsg ? local._default_asgs :  try(local.configuration_yml["network"]["asg"]["names"], local._default_asgs)
@@ -331,11 +311,9 @@ locals {
         ccportal  = ["asg-ssh", "asg-cyclecloud", "asg-telegraf", "asg-ad-client"]
         grafana   = ["asg-ssh", "asg-grafana", "asg-ad-client", "asg-telegraf", "asg-nfs-client"]
         jumpbox   = ["asg-ssh", "asg-jumpbox", "asg-ad-client", "asg-telegraf", "asg-nfs-client"]
-        lustre    = ["asg-ssh", "asg-lustre", "asg-lustre-client", "asg-telegraf"]
-        ondemand  = ["asg-ssh", "asg-ondemand", "asg-ad-client", "asg-nfs-client", "asg-pbs-client", "asg-lustre-client", "asg-telegraf", "asg-guacamole", "asg-cyclecloud-client", "asg-mariadb-client"]
+        ondemand  = ["asg-ssh", "asg-ondemand", "asg-ad-client", "asg-nfs-client", "asg-pbs-client", "asg-lustre-client", "asg-telegraf", "asg-cyclecloud-client", "asg-mariadb-client"]
         robinhood = ["asg-ssh", "asg-robinhood", "asg-lustre-client", "asg-telegraf"]
         scheduler = ["asg-ssh", "asg-pbs", "asg-ad-client", "asg-cyclecloud-client", "asg-nfs-client", "asg-telegraf", "asg-mariadb-client"]
-        guacamole = ["asg-ssh", "asg-ad-client", "asg-telegraf", "asg-nfs-client", "asg-cyclecloud-client", "asg-mariadb-client"]
     }
 
     # Open ports for NSG TCP rules
@@ -365,8 +343,6 @@ locals {
         CycleCloud = ["9443", "5672"],
         # MariaDB
         MariaDB = ["3306", "33060"],
-        # Guacamole
-        Guacamole = ["8080"]
         # WinRM
         WinRM = ["5985", "5986"]
     }
@@ -429,10 +405,12 @@ locals {
         AllowComputeSlurmIn         = ["405", "Inbound", "Allow", "*",   "Slurmd",             "asg/asg-ondemand",    "subnet/compute"],
 
         # Lustre
-        AllowLustreIn               = ["409", "Inbound", "Allow", "Tcp", "Lustre",             "asg/asg-lustre",        "asg/asg-lustre-client"],
-        AllowLustreClientIn         = ["410", "Inbound", "Allow", "Tcp", "Lustre",             "asg/asg-lustre-client", "asg/asg-lustre"],
-        AllowLustreClientComputeIn  = ["420", "Inbound", "Allow", "Tcp", "Lustre",             "subnet/compute",        "asg/asg-lustre"],
-        AllowRobinhoodIn            = ["430", "Inbound", "Allow", "Tcp", "Web",                "asg/asg-ondemand",      "asg/asg-robinhood"],
+        AllowLustreClientIn         = ["410", "Inbound", "Allow", "Tcp", "Lustre",             "asg/asg-lustre-client", "subnet/admin"],
+        AllowLustreClientComputeIn  = ["420", "Inbound", "Allow", "Tcp", "Lustre",             "subnet/compute",        "subnet/admin"],
+
+        # NFS
+        AllowNfsIn                  = ["430", "Inbound", "Allow", "*",   "Nfs",                "asg/asg-nfs-client",       "subnet/netapp"],
+        AllowNfsComputeIn           = ["435", "Inbound", "Allow", "*",   "Nfs",                "subnet/compute",           "subnet/netapp"],
 
         # CycleCloud
         AllowCycleWebIn             = ["440", "Inbound", "Allow", "Tcp", "Web",                "asg/asg-ondemand",          "asg/asg-cyclecloud"],
@@ -447,10 +425,6 @@ locals {
         # Admin and Deployment
         AllowWinRMIn                = ["520", "Inbound", "Allow", "Tcp", "WinRM",              "asg/asg-jumpbox",          "asg/asg-rdp"],
         AllowRdpIn                  = ["550", "Inbound", "Allow", "Tcp", "Rdp",                "asg/asg-jumpbox",          "asg/asg-rdp"],
-
-        # Guacamole
-#        AllowGuacamoleWebIn         = ["600", "Inbound", "Allow", "Tcp", "Guacamole",           "asg/asg-ondemand",          "asg/asg-guacamole"],
-        AllowGuacamoleRdpIn         = ["610", "Inbound", "Allow", "Tcp", "Rdp",                 "asg/asg-guacamole",         "subnet/compute"],
 
         # MariaDB
         AllowMariaDBIn              = ["700", "Inbound", "Allow", "Tcp", "MariaDB",             "asg/asg-mariadb-client",    "subnet/admin"],
@@ -497,11 +471,8 @@ locals {
         AllowSlurmComputeOut        = ["385", "Outbound", "Allow", "*",   "Slurmd",             "asg/asg-ondemand",        "subnet/compute"],
 
         # Lustre
-        AllowLustreOut              = ["390", "Outbound", "Allow", "Tcp", "Lustre",             "asg/asg-lustre",           "asg/asg-lustre-client"],
-        AllowLustreClientOut        = ["400", "Outbound", "Allow", "Tcp", "Lustre",             "asg/asg-lustre-client",    "asg/asg-lustre"],
-#        AllowLustreComputeOut       = ["410", "Outbound", "Allow", "Tcp", "Lustre",             "asg/asg-lustre",           "subnet/compute"],
-        AllowLustreClientComputeOut = ["420", "Outbound", "Allow", "Tcp", "Lustre",             "subnet/compute",           "asg/asg-lustre"],
-        AllowRobinhoodOut           = ["430", "Outbound", "Allow", "Tcp", "Web",                "asg/asg-ondemand",         "asg/asg-robinhood"],
+        AllowLustreClientOut        = ["400", "Outbound", "Allow", "Tcp", "Lustre",             "asg/asg-lustre-client",    "subnet/admin"],
+        AllowLustreClientComputeOut = ["420", "Outbound", "Allow", "Tcp", "Lustre",             "subnet/compute",           "subnet/admin"],
 
         # NFS
         AllowNfsOut                 = ["440", "Outbound", "Allow", "*",   "Nfs",                "asg/asg-nfs-client",       "subnet/netapp"],
@@ -526,10 +497,6 @@ locals {
         AllowRdpOut                 = ["570", "Outbound", "Allow", "Tcp", "Rdp",                "asg/asg-jumpbox",          "asg/asg-rdp"],
         AllowWinRMOut               = ["580", "Outbound", "Allow", "Tcp", "WinRM",              "asg/asg-jumpbox",          "asg/asg-rdp"],
         AllowDnsOut                 = ["590", "Outbound", "Allow", "*",   "Dns",                "tag/VirtualNetwork",       "tag/VirtualNetwork"],
-
-        # Guacamole
-#        AllowGuacamoleWebOut        = ["600", "Outbound", "Allow", "Tcp", "Guacamole",           "asg/asg-ondemand",         "asg/asg-guacamole"],
-        AllowGuacamoleRdpOut        = ["610", "Outbound", "Allow", "Tcp", "Rdp",                 "asg/asg-guacamole",         "subnet/compute"],
 
         # MariaDB
         AllowMariaDBOut             = ["700", "Outbound", "Allow", "Tcp", "MariaDB",             "asg/asg-mariadb-client",    "subnet/admin"],

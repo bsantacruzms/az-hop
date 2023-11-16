@@ -40,6 +40,9 @@ monitoring:
   # Optional settings to deploy Grafana and install Telegraf
   telegraf: true # Install telegraf on static infra VMs and dynamic compute nodes. Default: true
   grafana: true # Deploy a Grafana instance with pre-defined dashboards. Default: true
+  idle_threshold: '70' # default threshold to highlight idle VMs in grafana cluster stats dashboard
+  mem_threshold: '30' # default threshold to highlight VMs running out of memory in grafana cluster stats dashboard
+  iowait_threshold: '40' # default threshold to highlight VMs waiting on IO in  grafana cluster stats dashboard 
 
 #If set to true, it will create alert rules associated with az-hop. Enablement of alerting will require the specification of an admin email to send alerts to.
 alerting:
@@ -129,8 +132,11 @@ network:
       # bastion: # Bastion subnet name is always fixed to AzureBastionSubnet
       #   address_prefixes: "10.0.0.64/26" # CIDR minimal range must be /26
       #   create: true
+      # lustre: # Lustre subnet when deploying a lustre filesystem
+      #   address_prefixes: "10.0.0.128/26"
+      #   create: true
       # gateway: # Gateway subnet name is always fixed to GatewaySubnet
-      #   address_prefixes: "10.0.0.128/27" # Recommendation is to use /27 or /26 network
+      #   address_prefixes: "10.0.0.192/27" # Recommendation is to use /27 or /26 network
       #   create: true
       compute:
         name: compute
@@ -157,7 +163,6 @@ network:
 #     asg-robinhood: asg-robinhood
 #     asg-ondemand: asg-ondemand
 #     asg-deployer: asg-deployer
-#     asg-guacamole: asg-guacamole
 #     asg-mariadb-client: asg-mariadb-client
     
 #  peering: # This list is optional, and can be used to create VNet Peerings in the same subscription.
@@ -177,13 +182,12 @@ locked_down_network:
   public_ip: true # Enable public IP creation for Jumpbox, OnDemand and create images. Default to true
 
 # Base image configuration. Can be either an image reference or an image_id from the image registry or a custom managed image
+# For AlmaLinux 8.7 use almalinux:almalinux-x86_64:8_7-gen2:latest
+# For CentOS 7.9 use OpenLogic:CentOS:7_9-gen2:latest
 linux_base_image: "OpenLogic:CentOS:7_9-gen2:latest" # publisher:offer:sku:version or image_id
 # linux image plan if required, format is publisher:product:name
 #linux_base_plan:
 windows_base_image: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-smalldisk:latest" # publisher:offer:sku:version or image_id
-lustre_base_image: "azhpc:azurehpc-lustre:azurehpc-lustre-2_12:latest"
-# The lustre plan to use. Only needed when using the default lustre image from the marketplace. use "::" for an empty plan
-lustre_base_plan: "azhpc:azurehpc-lustre:azurehpc-lustre-2_12" # publisher:product:name
 
 domain:
   name: "hpc.azure"
@@ -210,34 +214,38 @@ domain:
 
 # Jumpbox VM configuration, only needed when deploying thru a public IP and without a configured deployer VM
 jumpbox:
+  name: jumpbox
   vm_size: Standard_B2ms
   # SSH port under which the jumpbox SSH server listens on the public IP. Default to 22
   # Change this to, e.g., 2222, if security policies (like "zero trust") in your tenant automatically block access to port 22 from the internet
   #ssh_port: 2222
 # Active directory VM configuration
 ad:
+  name: ad
   vm_size: Standard_B2ms
   hybrid_benefit: false # Enable hybrid benefit for AD, default to false
   high_availability: false # Build AD in High Availability mode (2 Domain Controlers) - default to false
+  ha_name: ad2 # name of the HA AD machine when high_availability=true
 
 # On demand VM configuration
 ondemand:
+  name: ondemand
   vm_size: Standard_D4s_v5
   #fqdn: azhop.foo.com # When provided it will be used for the certificate server name
   generate_certificate: true # Generate an SSL certificate for the OnDemand portal. Default to true
 # Grafana VM configuration
 grafana:
-  vm_size: Standard_B2ms
-# Guacamole VM configuration
-guacamole:
+  name: grafana
   vm_size: Standard_B2ms
 # Scheduler VM configuration
 scheduler:
+  name: scheduler
   vm_size: Standard_B2ms
 # CycleCloud VM configuration
 cyclecloud:
+  name: ccportal
   vm_size: Standard_B2ms
-  # version: 8.4.0-3122 # to specify a specific version, see https://packages.microsoft.com/yumrepos/cyclecloud/
+  # version: # to specify a specific version, see https://packages.microsoft.com/yumrepos/cyclecloud/
   # Optional: use Ubuntu for the CycleCloud VM (default: linux_base_image)
   # image: "canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest"
   # plan: publisher:product:name
@@ -245,13 +253,16 @@ cyclecloud:
 # Lustre cluster is optional and can be used to create a Lustre cluster in the environment.
 lustre:
   create: false # true or false to create a lustre cluster
-  rbh_sku: "Standard_D8d_v4"
-  mds_sku: "Standard_D8d_v4"
-  oss_sku: "Standard_D32d_v4"
-  oss_count: 2
-  hsm_max_requests: 8
-  mdt_device: "/dev/sdb"
-  ost_device: "/dev/sdb"
+  # Options: AMLFS-Durable-Premium-40, AMLFS-Durable-Premium-125, AMLFS-Durable-Premium-250, AMLFS-Durable-Premium-500
+  # See documentation for more details: https://learn.microsoft.com/en-us/azure/azure-managed-lustre/create-file-system-resource-manager
+  sku: AMLFS-Durable-Premium-250
+  # The step sizes are dependent on the SKU.
+  # - AMLFS-Durable-Premium-40: 48TB
+  # - AMLFS-Durable-Premium-125: 16TB
+  # - AMLFS-Durable-Premium-250: 8TB
+  # - AMLFS-Durable-Premium-500: 4TB
+  capacity: 8
+
   # optional to use existing storage for the archive
   # if not included it will use the azhop storage account that is created
   # hsm:
@@ -296,11 +307,10 @@ queue_manager: openpbs
 slurm:
   # Enable SLURM accounting, this will create a SLURM accounting database in a managed MariaDB server instance
   accounting_enabled: false
-  # SLURM version to install. Currently supported: only 20.11.9 and 22.05.3.
-  # Other versions can be installed by building from source (See build_rpms setting in the slurmserver role)
-  slurm_version: 20.11.9
-  # CycleCloud for SLURM project version as defined in https://github.com/Azure/cyclecloud-slurm/releases. Currently supported: only 2.7.0 and 2.7.1. Default to 2.7.1
-  cyclecloud_slurm_version: 2.7.1
+  # SLURM version to install. Currently supported: only [20.11.9 | 22.05.3] with cyclecloud_slurm_version==2.7.x and [22.05.9 | 23.02.5] with cyclecloud_slurm_version==3.0.x.
+  slurm_version: 22.05.9
+  # CycleCloud for SLURM project version as defined in https://github.com/Azure/cyclecloud-slurm/releases. Currently supported: 2.7.0-2.7.2, 3.0.4.
+  cyclecloud_slurm_version: 3.0.4
   # Name of the SLURM cluster for accounting (optional, default to 'slurm')
   # WARNING: changing this value on a running cluster will cause slurmctld to fail to start. This is a
   # safety check to prevent accounting errors. To override, remove /var/spool/slurmd/clustername
@@ -313,7 +323,7 @@ enroot:
   # Resource name of the MariaDB instance to be created
   #name: custom_mariadb_name
 
-  # If using an existing Managed MariaDB instance for SLURM accounting and/or Guacamole, specify these values
+  # If using an existing Managed MariaDB instance for SLURM accounting, specify these values
   # Admin user of the database for which the password will be retrieved from the azhop keyvault
   #user: sqladmin
   # FQDN of the existing managed instance
@@ -349,6 +359,7 @@ authentication:
   #   OIDCPassIDTokenAs: # for AAD use 'serialized'
   #   OIDCPassRefreshToken: # for AAD use 'On'
   #   OIDCPassClaimsAs: # for AAD use 'environment'
+  #   OIDCStateMaxNumberOfCookies: # in case of too many connections error for the same user set this to [10, true]
 
 image_gallery:
   create: false # Create the shared image gallery to store custom images
@@ -414,13 +425,6 @@ images:
     hyper_v: V2
     os_type: Linux
     version: 7.9
-  - name: azhop-compute-ubuntu-18_04
-    publisher: azhpc
-    offer: azhop-compute
-    sku: ubuntu-1804
-    hyper_v: V2
-    os_type: Linux
-    version: 18.04
   - name: azhop-desktop-ubuntu-20_04
     publisher: azhpc
     offer: azhop-desktop
@@ -451,7 +455,7 @@ autoscale:
 # List of queues (node arrays in Cycle) to be defined
 # don't use queue names longer than 8 characters in order to leave space for node suffix, as hostnames are limited to 15 chars due to domain join and NETBIOS constraints.
 queues:
-  - name: execute # name of the Cycle Cloud node array
+  - name: htc # name of the Cycle Cloud node array
     # Azure VM Instance type
     vm_size: Standard_F2s_v2
     # maximum number of cores that can be instanciated
@@ -473,23 +477,15 @@ queues:
     # Set the max number of vm's in a VMSS; requires additional limit raise through support ticket for >100; 
     # 100 is default value; lower numbers will improve scaling for single node jobs or jobs with small number of nodes
     MaxScaleSetSize: 100
-  - name: hc44rs
-    vm_size: Standard_HC44rs
-    max_core_count: 440
-    image: azhpc:azhop-compute:centos-7_9:latest
-    spot: true
-    EnableAcceleratedNetworking: true
-  - name: hb120v2
-    vm_size: Standard_HB120rs_v2
-    max_core_count: 1200
-    image: azhpc:azhop-compute:centos-7_9:latest
-    spot: true
-    EnableAcceleratedNetworking: true
-  - name: hb120v3
+  - name: hpc
     vm_size: Standard_HB120rs_v3
     max_core_count: 1200
     image: azhpc:azhop-compute:centos-7_9:latest
-    spot: true
+    EnableAcceleratedNetworking: true
+  - name: gpu
+    vm_size: Standard_NC24ads_A100_v4
+    max_core_count: 0
+    image: azhpc:azhop-compute:centos-7_9:latest
     EnableAcceleratedNetworking: true
     # Queue dedicated to GPU remote viz nodes. This name is fixed and can't be changed
   - name: viz3d
@@ -500,7 +496,6 @@ queues:
     # Use this image ID when building your own custom images
     #image: /subscriptions/{{subscription_id}}/resourceGroups/{{resource_group}}/providers/Microsoft.Compute/galleries/{{sig_name}}/images/azhop-centos79-desktop3d/latest
     ColocateNodes: false
-    spot: false
     EnableAcceleratedNetworking: true
     max_hours: 12 # Maximum session duration
     min_hours: 1 # Minimum session duration - 0 is infinite
@@ -511,7 +506,6 @@ queues:
     image: azhpc:azhop-desktop:centos-7_9:latest
     ColocateNodes: false
     EnableAcceleratedNetworking: true
-    spot: false
     max_hours: 12
     min_hours: 1
     # Queue dedicated to non GPU remote viz nodes. This name is fixed and can't be changed
@@ -520,22 +514,9 @@ queues:
     max_core_count: 200
     image: azhpc:azhop-desktop:centos-7_9:latest
     ColocateNodes: false
-    spot: false
     EnableAcceleratedNetworking: true
     max_hours: 12
     min_hours: 1
-
-# Remote Visualization definitions
-enable_remote_winviz: false # Set to true to enable windows remote visualization
-
-remoteviz:
-  - name: winviz # This name is fixed and can't be changed
-    vm_size: Standard_NV12s_v3 # Standard_NV8as_v4 Only NVsv3 and NVsV4 are supported
-    max_core_count: 48
-    image: "MicrosoftWindowsDesktop:Windows-10:21h1-pron:latest"
-    ColocateNodes: false
-    spot: false
-    EnableAcceleratedNetworking: true
 
 # Application settings
 applications:

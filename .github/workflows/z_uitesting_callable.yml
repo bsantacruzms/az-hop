@@ -45,13 +45,13 @@ jobs:
   #   runs-on: self-hosted
   #   name: init_matrix
   #   container:
-  #     image: azhop.azurecr.io/hpcrover:2306.0708
+  #     image: azhop.azurecr.io/hpcrover:latest
   #     credentials:
   #       username: ${{ env.ARM_CLIENT_ID }}
   #       password: ${{ env.ARM_CLIENT_SECRET }}
   #     options: --user 0
   #   steps:
-  #     - uses: actions/checkout@v3
+  #     - uses: actions/checkout@v4
   #       with:
   #         submodules: true
   #     - name: Login azure
@@ -89,15 +89,15 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3.7.0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4.0.0
         with:
           node-version: '14.x'
       - name: Install dependencies

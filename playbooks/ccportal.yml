@@ -38,12 +38,13 @@
       cc_storage: '{{global_cc_storage}}'
       cc_domain: '{{domain_name}}'
       cc_ldap_server: '{{ldap_server}}'
-      cc_version: '{{cyclecloud.version | default("8.4.0-3122")}}'
+      cc_version: '{{cyclecloud.version | default("")}}'
+      install_cyclecloud: '{{not "azurecyclecloud" in (cyclecloud.image | default(""))}}' # don't install cyclecloud when using the azurecyclecloud marketplace image
 
-  - name: update packages for security
-    become: true
-    yum:
-      name: '*'
-      state: latest
-      exclude: cyclecloud*
-    when: ansible_distribution == "CentOS"
+  - name: Update Packages
+    include_role:
+      name: pkg_update
+      apply: 
+        become: true
+    vars:
+      packages_to_exclude_from_upgrade: "cyclecloud*"

@@ -1,0 +1,54 @@
+#
+# Copyright (c) Microsoft Corporation
+# Licensed under the MIT License.
+#
+name : marketplace application
+on:
+  push:
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'bicep/**'
+      - 'marketplace/solution/**'
+  workflow_dispatch:
+
+env:
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}  # https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  arm_validation:
+    runs-on: ubuntu-latest
+
+    container:
+      image: azhop.azurecr.io/hpcrover:latest
+      credentials:
+        username: ${{ env.ARM_CLIENT_ID }}
+        password: ${{ env.ARM_CLIENT_SECRET }}
+      options: --user 0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ARM
+        id: build
+        run: |
+          set -e
+          source /miniconda/bin/activate
+          ./marketplace/solution/build.sh $BRANCH_NAME
+          echo "escaped_branch_name=${BRANCH_NAME//\//_}" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v3
+#        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: marketplace package
+          path: marketplace/solution/build_${{ env.escaped_branch_name }}
+          if-no-files-found: error

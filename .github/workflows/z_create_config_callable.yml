@@ -28,11 +28,6 @@ on:
         required: false
         default: 'false' # use it with ${{ inputs.lustre }}
         type: string
-      winviz:
-        description: 'Enable Winviz (true/false) - Default to false'
-        required: false
-        default: 'false' # use it with ${{ inputs.winviz }}
-        type: string
       home_type:
         description: 'Home directory type anf/azurefiles- Default to anf'
         required: false
@@ -53,6 +48,12 @@ on:
         required: false
         default: 'centos' # use it with ${{ inputs.infra_os }}
         type: string
+      cycle_slurm_version:
+        description: 'Version of the cyclecloud slurm project 2.7 or 3.0 - default to 2.7'
+        required: false
+        default: '2.7' # use it with ${{ inputs.cycle_slurm_version }}
+        type: string
+
     outputs:
       resource_group:
         description: 'Resource group name'
@@ -92,7 +93,7 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
@@ -102,7 +103,7 @@ jobs:
         resource_group: ${{ steps.build_config.outputs.resource_group }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -140,7 +141,15 @@ jobs:
 
             # Add scheduler configuration
             SCHEDULER=${{ inputs.scheduler }}
-            cat $AZHOP_CONFIGURATION_DIR/$SCHEDULER.yml >> config.yml
+            CYCLE_SLURM_VERSION=${{ inputs.cycle_slurm_version }}
+            case $SCHEDULER in
+              slurm)
+                cat $AZHOP_CONFIGURATION_DIR/${SCHEDULER}_${CYCLE_SLURM_VERSION}.yml >> config.yml
+              ;;
+              openpbs)
+                cat $AZHOP_CONFIGURATION_DIR/$SCHEDULER.yml >> config.yml
+              ;;
+            esac
             sed -i "s/__SCHEDULER__/$SCHEDULER/g" config.yml
 
             # Add local configuration
@@ -156,12 +165,6 @@ jobs:
             DEPLOY_LUSTRE=${{ inputs.lustre }}
             if [ "$DEPLOY_LUSTRE" == "true" ]; then
               cat $AZHOP_LUSTRE_CONFIGURATION >> config.yml
-            fi
-
-            # Add winviz configuration if winviz is true
-            WINVIZ=${{ inputs.winviz }}
-            if [ "$WINVIZ" == "true" ]; then
-              cat $AZHOP_CONFIGURATION_DIR/winviz.yml >> config.yml
             fi
 
             # Add user authentication configuration
@@ -193,7 +196,6 @@ jobs:
                 sed -i "s|azhpc:azhop-desktop:centos-7_9:latest|$SHARED_SIG/azhop-desktop-centos-7_9/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:almalinux-8_7:latest|$SHARED_SIG/azhop-compute-almalinux-8_7/latest|g" config.yml
                 sed -i "s|azhpc:azhop-desktop:almalinux-8_7:latest|$SHARED_SIG/azhop-desktop-almalinux-8_7/latest|g" config.yml
-                sed -i "s|azhpc:azhop-compute:ubuntu-18_04:latest|$SHARED_SIG/azhop-compute-ubuntu-1804/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:ubuntu-20_04:latest|$SHARED_SIG/azhop-compute-ubuntu-2004/latest|g" config.yml
 
                 sed -i "s|__ALMA8_PLAN__|plan: almalinux:almalinux-hpc:8_7-hpc-gen2|g" config.yml
@@ -206,7 +208,6 @@ jobs:
                 sed -i "s|azhpc:azhop-desktop:centos-7_9:latest|$SIG/azhop-desktop-centos-7_9/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:almalinux-8_7:latest|$SIG/azhop-compute-almalinux-8_7/latest|g" config.yml
                 sed -i "s|azhpc:azhop-desktop:almalinux-8_7:latest|$SIG/azhop-desktop-almalinux-8_7/latest|g" config.yml
-                sed -i "s|azhpc:azhop-compute:ubuntu-18_04:latest|$SIG/azhop-compute-ubuntu-1804/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:ubuntu-20_04:latest|$SIG/azhop-compute-ubuntu-2004/latest|g" config.yml
 
                 sed -i "s|__ALMA8_PLAN__|plan: almalinux:almalinux-hpc:8_7-hpc-gen2|g" config.yml

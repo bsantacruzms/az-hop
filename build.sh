@@ -204,28 +204,6 @@ function check_azcli_version {
   fi
 }
 
-function accept_terms()
-{
-  # Accept Lustre marketplace image terms
-  accepted=$(az vm image terms show --offer azurehpc-lustre --publisher azhpc --plan azurehpc-lustre-2_12 --query 'accepted' -o tsv)
-  if [ "$accepted" != "true" ]; then
-    echo "Azure Lustre marketplace image terms are not accepted, accepting them now"
-    az vm image terms accept --offer azurehpc-lustre --publisher azhpc --plan azurehpc-lustre-2_12 -o tsv
-  else
-    echo "Azure Lustre marketplace image terms already accepted"
-  fi
-
-  # Accept AlmaLinux marketplace image terms
-  # accepted=$(az vm image terms show --offer almalinux-hpc --publisher almalinux --plan 8_5-hpc-gen2 --query 'accepted' -o tsv)
-  # if [ "$accepted" != "true" ]; then
-  #   echo "Azure AlmaLinux marketplace image terms are not accepted, accepting them now"
-  #   az vm image terms accept --offer almalinux-hpc --publisher almalinux --plan 8_5-hpc-gen2 -o tsv
-  # else
-  #   echo "Azure AlmaLinux marketplace image terms already accepted"
-  # fi
-
-}
-
 function get_azure_cloud_env()
 {
   # Retrieve on which cloud environment we run on
@@ -298,7 +276,7 @@ function set_bicep_azhopconfig()
 function arm_init()
 {
   pushd $ARM_ROOT
-  ./build.sh
+  ./build.sh local
   popd
 }
 
@@ -377,7 +355,7 @@ function bicep_run()
       TEMPLATE_FILE=$BICEP_ROOT/mainTemplate.bicep
       ;;
     "arm")
-      TEMPLATE_FILE=$ARM_ROOT/build/mainTemplate.json
+      TEMPLATE_FILE=$ARM_ROOT/build_local/mainTemplate.json
       echo "* Deploying using ARM"
       ;;
   esac
@@ -417,7 +395,7 @@ function bicep_run()
     mkdir -p $AZHOP_ROOT/playbooks/group_vars
     jq .azhopGlobalConfig.value $AZHOP_DEPLOYMENT_OUTPUT | yq -P > $AZHOP_ROOT/playbooks/group_vars/all.yml
 
-    jq '.azhopInventory.value.all.hosts *= (.lustre_oss_private_ips.value | to_entries | map({("lustre-oss-" + (.key | tostring)): {"ansible_host": .value}}) | add // {}) | .azhopInventory.value' $AZHOP_DEPLOYMENT_OUTPUT | yq -P > $AZHOP_ROOT/playbooks/inventory
+    jq '.azhopInventory.value' $AZHOP_DEPLOYMENT_OUTPUT | yq -P > $AZHOP_ROOT/playbooks/inventory
 
     # substitute passwords into the file
     #  - __ADMIN_PASSWORD__
@@ -441,7 +419,7 @@ while (( "$#" )); do
     -a|--action)
       TF_COMMAND=${2}
       # verify that the action is either plan, apply or destroy
-      if [ "$TF_COMMAND" != "plan" ] && [ "$TF_COMMAND" != "apply" ] && [ "$TF_COMMAND" != "destroy" ]; then
+      if [ "$TF_COMMAND" != "plan" ] && [ "$TF_COMMAND" != "apply" ] && [ "$TF_COMMAND" != "destroy" ] && [ "$TF_COMMAND" != "import" ] && [ "$TF_COMMAND" != "state" ]; then
         echo "Invalid action $TF_COMMAND. Valid values are plan, apply or destroy"
         exit 1
       fi

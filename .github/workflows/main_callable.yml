@@ -100,7 +100,7 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
@@ -116,12 +116,11 @@ jobs:
         run_addusers_job: ${{ steps.deploy.outputs.run_addusers_job }}
         run_cyclecluster_job: ${{ steps.deploy.outputs.run_cyclecluster_job }}
         run_ood_job: ${{ steps.deploy.outputs.run_ood_job }}
-        run_guacamole_job: ${{ steps.deploy.outputs.run_guacamole_job }}
         run_tests_job: ${{ steps.deploy.outputs.run_tests_job }}
         run_telegraf_job: ${{ steps.deploy.outputs.run_telegraf_job }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -187,7 +186,6 @@ jobs:
                 sed -i "s|azhpc:azhop-compute:centos-7_9:latest|$SHARED_SIG/azhop-compute-centos-7_9/latest|g" config.yml
                 sed -i "s|azhpc:azhop-desktop:centos-7_9:latest|$SHARED_SIG/azhop-desktop-centos-7_9/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:almalinux-8_7:latest|$SHARED_SIG/azhop-compute-almalinux-8_7/latest|g" config.yml
-                sed -i "s|azhpc:azhop-compute:ubuntu-18_04:latest|$SHARED_SIG/azhop-compute-ubuntu-1804/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:ubuntu-20_04:latest|$SHARED_SIG/azhop-compute-ubuntu-2004/latest|g" config.yml
 
                 sed -i "s|__ALMA8_PLAN__|plan: almalinux:almalinux:8-gen2|g" config.yml
@@ -199,7 +197,6 @@ jobs:
                 sed -i "s|azhpc:azhop-compute:centos-7_9:latest|$SIG/azhop-compute-centos-7_9/latest|g" config.yml
                 sed -i "s|azhpc:azhop-desktop:centos-7_9:latest|$SIG/azhop-desktop-centos-7_9/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:almalinux-8_7:latest|$SIG/azhop-compute-almalinux-8_7/latest|g" config.yml
-                sed -i "s|azhpc:azhop-compute:ubuntu-18_04:latest|$SIG/azhop-compute-ubuntu-1804/latest|g" config.yml
                 sed -i "s|azhpc:azhop-compute:ubuntu-20_04:latest|$SIG/azhop-compute-ubuntu-2004/latest|g" config.yml
 
                 sed -i "s|__ALMA8_PLAN__|plan: almalinux:almalinux:8-gen2|g" config.yml
@@ -288,7 +285,6 @@ jobs:
           run_addusers_job=$deploy_and_install
           run_cyclecluster_job=$deploy_and_install
           run_ood_job=$deploy_and_install
-          run_guacamole_job=$deploy_and_install
           run_tests_job=$deploy_and_install
           run_telegraf_job=$deploy_and_install
 
@@ -302,7 +298,6 @@ jobs:
             run_addusers_job=false
             run_cyclecluster_job=false
             run_ood_job=false
-            run_guacamole_job=false
             run_tests_job=false
             run_telegraf_job=false
           else
@@ -322,7 +317,6 @@ jobs:
           echo "run_addusers_job=$run_addusers_job" >> $GITHUB_OUTPUT
           echo "run_cyclecluster_job=$run_cyclecluster_job" >> $GITHUB_OUTPUT
           echo "run_ood_job=$run_ood_job" >> $GITHUB_OUTPUT
-          echo "run_guacamole_job=$run_guacamole_job" >> $GITHUB_OUTPUT
           echo "run_tests_job=$run_tests_job" >> $GITHUB_OUTPUT
           echo "run_telegraf_job=$run_telegraf_job" >> $GITHUB_OUTPUT
           exit $build_error
@@ -333,14 +327,14 @@ jobs:
     needs: deploy
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_ad_job == 'true'
@@ -369,14 +363,14 @@ jobs:
 #    if: inputs.deploy_only == 'false' && inputs.deploy_with != 'arm'
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_lustre_job == 'true'
@@ -405,14 +399,14 @@ jobs:
     needs: [cycle_cluster, lustre, deploy]
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_ood_job == 'true'
@@ -438,14 +432,14 @@ jobs:
     needs: [ad, deploy]
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_grafana_job == 'true'
@@ -471,14 +465,14 @@ jobs:
     needs: [ad, deploy]
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_cycle_job == 'true'
@@ -504,14 +498,14 @@ jobs:
     needs: [cycle, deploy]
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_addusers_job == 'true'
@@ -537,14 +531,14 @@ jobs:
     needs: [add_users, deploy, build_image]
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_cyclecluster_job == 'true'
@@ -565,54 +559,20 @@ jobs:
           ./install.sh cccluster
           ./install.sh scheduler
 
-  guacamole:
-    name: guacamole
-    runs-on: self-hosted
-    needs: [cycle, ood, deploy]
-
-    container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
-      credentials:
-        username: ${{ env.ARM_CLIENT_ID }}
-        password: ${{ env.ARM_CLIENT_SECRET }}
-      options: --user 0
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-        if: needs.deploy.outputs.run_guacamole_job == 'true'
-
-      - name: Login azure
-        if: needs.deploy.outputs.run_guacamole_job == 'true'
-        run: |
-          source /miniconda/bin/activate
-          az login --service-principal -u '${{ env.ARM_CLIENT_ID }}' -p '${{ env.ARM_CLIENT_SECRET }}' --tenant '${{ env.ARM_TENANT_ID }}'
-          az account set -s  ${{ env.ARM_SUBSCRIPTION_ID }}
-
-      - name: Install applications
-        if: needs.deploy.outputs.run_guacamole_job == 'true'
-        run: |
-          source /miniconda/bin/activate
-          RESOURCE_GROUP=${{needs.deploy.outputs.resource_group}}
-          ./azhop_state.sh download ${{ env.AZHOP_STATE_ACCOUNT }} ${{ env.AZHOP_STATE_CONTAINER }} $RESOURCE_GROUP
-          ./install.sh guacamole
-          ./install.sh guac_spooler
-
   telegraf:
     name: telegraf
     runs-on: self-hosted
-    needs: [grafana, cycle, deploy, guacamole]
+    needs: [grafana, cycle, deploy]
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_telegraf_job == 'true'
@@ -640,14 +600,14 @@ jobs:
     if: inputs.deploy_only == 'false'
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -684,14 +644,14 @@ jobs:
       matrix:
         packer_file: ${{ fromJson(needs.set_image_list.outputs.matrix) }}
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_image_job == 'true'
@@ -720,14 +680,14 @@ jobs:
     runs-on: self-hosted
     needs: [deploy, cycle, ood, cycle_cluster]
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
         if: needs.deploy.outputs.run_tests_job == 'true'
@@ -754,14 +714,14 @@ jobs:
     needs: [deploy, run_tests, telegraf]
 
     container:
-      image: azhop.azurecr.io/hpcrover:2306.0708
+      image: azhop.azurecr.io/hpcrover:latest
       credentials:
         username: ${{ env.ARM_CLIENT_ID }}
         password: ${{ env.ARM_CLIENT_SECRET }}
       options: --user 0
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Login azure
         run: |
